@@ -1,0 +1,117 @@
+@import "tailwindcss";
+
+@theme {
+  --font-book: "Georgia", "Iowan Old Style", "Palatino Linotype", "Times New Roman", serif;
+  --font-sans: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+}
+
+body {
+  font-family: var(--font-sans);
+  color: #3b2412;
+  background: #f6efe2;
+}
+
+.library-wall {
+  background-color: #6b4226;
+  background-image:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.08) 0 2px, transparent 2px 120px),
+    linear-gradient(180deg, #7a4b2b 0%, #5a3620 100%);
+}
+
+.paper {
+  background: #fdf8ec;
+  background-image: radial-gradient(rgba(120, 80, 30, 0.05) 1px, transparent 1px);
+  background-size: 6px 6px;
+}
+
+.input {
+  border-radius: 0.5rem;
+  border: 1px solid #d6c2a0;
+  background: white;
+  padding: 0.55rem 0.75rem;
+  outline: none;
+}
+.input:focus {
+  border-color: #b7791f;
+  box-shadow: 0 0 0 3px rgba(183, 121, 31, 0.25);
+}
+
+.btn-primary,
+.btn-secondary,
+.btn-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border-radius: 0.6rem;
+  padding: 0.55rem 1.1rem;
+  font-weight: 600;
+  transition:
+    background-color 0.15s,
+    transform 0.1s;
+  cursor: pointer;
+}
+.btn-primary:active,
+.btn-secondary:active,
+.btn-danger:active {
+  transform: translateY(1px);
+}
+.btn-primary {
+  background: #9a3412;
+  color: white;
+}
+.btn-primary:hover {
+  background: #7c2d12;
+}
+.btn-secondary {
+  background: #f3e6cc;
+  color: #5a3620;
+  border: 1px solid #d6c2a0;
+}
+.btn-secondary:hover {
+  background: #ead7b0;
+}
+.btn-danger {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+.btn-danger:hover {
+  background: #fecaca;
+}
+.btn-primary:disabled,
+.btn-secondary:disabled,
+.btn-danger:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Bookshelf */
+.shelf-board {
+  background: linear-gradient(180deg, #a86b3c 0%, #8a5530 45%, #6e4224 100%);
+  box-shadow:
+    0 10px 18px rgba(0, 0, 0, 0.45),
+    inset 0 2px 0 rgba(255, 255, 255, 0.15);
+}
+.shelf-back {
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0.1) 30%, rgba(0, 0, 0, 0.25)),
+    repeating-linear-gradient(90deg, #4a2c17 0 3px, #553320 3px 90px);
+}
+.spine-text {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+}
+.book-page {
+  background: linear-gradient(90deg, #efe4cc 0%, #fdf8ec 6%, #fdf8ec 100%);
+}
+.book-page-left {
+  background: linear-gradient(270deg, #efe4cc 0%, #fdf8ec 6%, #fdf8ec 100%);
+}
+.backface-hidden {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.preserve-3d {
+  transform-style: preserve-3d;
+}
