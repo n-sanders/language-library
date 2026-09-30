@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 
-export type ActionResult = { ok?: boolean; error?: string; message?: string };
+export type ActionResult = { ok?: boolean; error?: string; message?: string; review?: string };
 export type FormAction = (prev: ActionResult, formData: FormData) => Promise<ActionResult>;
 
 export function ActionForm({

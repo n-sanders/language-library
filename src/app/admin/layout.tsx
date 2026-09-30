@@ -22,6 +22,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <nav className="mx-auto flex max-w-6xl gap-1 px-6">
           <Tab href="/admin">Students</Tab>
           <Tab href="/admin/settings">AI settings</Tab>
+          <Tab href="/admin/audit">AI audit</Tab>
           <Tab href="/admin/reports">
             Problem reports
             {openReports > 0 && (

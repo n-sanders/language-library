@@ -67,7 +67,8 @@ export default async function SettingsPage() {
         <h2 className="text-lg font-bold">Models</h2>
         <p className="mb-4 text-sm text-stone-600">
           Start typing to search OpenRouter&apos;s model list. The sentence writer needs a model that follows
-          instructions carefully; the helper can be a cheaper, faster one.
+          instructions carefully; the helper can be a cheaper, faster one. The audit reviewer reads student history
+          when you ask it to on the AI audit page.
           {modelsError && <span className="block text-red-700">Model list unavailable: {modelsError}</span>}
         </p>
         <ActionForm action={saveModels} submitLabel="Save models">
@@ -76,6 +77,9 @@ export default async function SettingsPage() {
           </Field>
           <Field label="Helper chat" hint="Answers student questions in the practice helper panel.">
             <input name="helperModel" list="model-list" defaultValue={models.helper} required className="input" />
+          </Field>
+          <Field label="Audit reviewer" hint="Reads a slice of student helper messages and custom topics when you ask it to on the AI audit page.">
+            <input name="auditModel" list="model-list" defaultValue={models.audit} required className="input" />
           </Field>
           <datalist id="model-list">
             {available.map((m) => (

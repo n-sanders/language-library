@@ -105,7 +105,12 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
       </section>
 
       <section>
-        <h2 className="mb-3 text-lg font-bold">Recent sentences</h2>
+        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-lg font-bold">Recent sentences</h2>
+          <Link href={`/admin/audit?student=${student.id}`} className="text-sm font-semibold text-amber-800 hover:underline">
+            AI audit for this student
+          </Link>
+        </div>
         {recent.length === 0 ? (
           <p className="text-stone-600">No sentences yet.</p>
         ) : (

@@ -4,7 +4,9 @@ import { and, eq, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getDb, schema } from "@/db";
 import type { ActionResult } from "@/components/admin/ActionForm";
-import { testConnection } from "@/lib/ai/openrouter";
+import { complete, testConnection } from "@/lib/ai/openrouter";
+import { auditReviewMessages } from "@/lib/ai/prompts";
+import { formatAuditTranscript, loadAuditEvents, parseAuditKind, parseAuditStudentId, parseAuditWindow } from "@/lib/audit";
 import { destroyAllSessionsForUser, requireAdmin } from "@/lib/auth";
 import { hashPassword, MIN_PASSWORD_LENGTH } from "@/lib/password";
 import { clearApiKey as clearStoredKey, getModels, setApiKey, setModels } from "@/lib/settings";
@@ -125,8 +127,9 @@ export async function saveModels(_prev: ActionResult, fd: FormData): Promise<Act
   await requireAdmin();
   const sentence = str(fd, "sentenceModel");
   const helper = str(fd, "helperModel");
-  if (!sentence || !helper) return fail("Choose a model for both features.");
-  setModels({ sentence, helper });
+  const audit = str(fd, "auditModel");
+  if (!sentence || !helper || !audit) return fail("Choose a model for every feature.");
+  setModels({ sentence, helper, audit });
   revalidatePath("/admin/settings");
   return { ok: true, message: "Models saved." };
 }
@@ -135,14 +138,61 @@ export async function runConnectionTest(): Promise<ActionResult> {
   await requireAdmin();
   const models = getModels();
   try {
-    const sentenceReply = await testConnection(models.sentence);
-    const helperReply = models.helper === models.sentence ? sentenceReply : await testConnection(models.helper);
+    const replies = new Map<string, string>();
+    const replyFor = async (model: string) => {
+      const cached = replies.get(model);
+      if (cached !== undefined) return cached;
+      const reply = await testConnection(model);
+      replies.set(model, reply);
+      return reply;
+    };
+    const sentenceReply = await replyFor(models.sentence);
+    const helperReply = await replyFor(models.helper);
+    const auditReply = await replyFor(models.audit);
     return {
       ok: true,
-      message: `Connected. Sentence model replied "${sentenceReply}", helper model replied "${helperReply}".`,
+      message: `Connected. Sentence model replied "${sentenceReply}", helper model replied "${helperReply}", audit model replied "${auditReply}".`,
     };
   } catch (err) {
     return fail(err instanceof Error ? err.message : "Connection failed.");
+  }
+}
+
+export async function runAuditReview(_prev: ActionResult, fd: FormData): Promise<ActionResult> {
+  await requireAdmin();
+  const instruction = str(fd, "prompt");
+  const windowSize = parseAuditWindow(str(fd, "window"));
+  if (!instruction) return fail("Write what you want the model to look for.");
+  if (instruction.length > 2000) return fail("Keep the instruction under 2000 characters.");
+  if (windowSize === null) return fail("Pick how much history to review.");
+
+  const events = loadAuditEvents({
+    studentId: parseAuditStudentId(str(fd, "student")),
+    kind: parseAuditKind(str(fd, "kind")),
+    q: "",
+    limit: windowSize,
+  });
+  const transcript = formatAuditTranscript(events);
+  const coverage = transcript.truncated
+    ? `Reviewed the newest ${transcript.included} of ${windowSize} events. Older ones were left out so the review would fit.`
+    : `Reviewed ${transcript.included} ${transcript.included === 1 ? "event" : "events"}.`;
+  if (transcript.included === 0) return { ok: true, message: "Nothing in this window to review." };
+
+  try {
+    const review = await complete({
+      model: getModels().audit,
+      temperature: 0.2,
+      messages: auditReviewMessages({
+        instruction,
+        transcript: transcript.text,
+        included: transcript.included,
+        requested: windowSize,
+        truncated: transcript.truncated,
+      }),
+    });
+    return { ok: true, review, message: coverage };
+  } catch (err) {
+    return fail(err instanceof Error ? err.message : "The review failed.");
   }
 }
 

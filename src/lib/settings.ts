@@ -6,11 +6,13 @@ export const SETTING_KEYS = {
   apiKey: "openrouter.api_key",
   sentenceModel: "model.sentence",
   helperModel: "model.helper",
+  auditModel: "model.audit",
 } as const;
 
 export const DEFAULT_MODELS = {
   sentence: "openai/gpt-4o-mini",
   helper: "openai/gpt-4o-mini",
+  audit: "openai/gpt-4o-mini",
 };
 
 function read(key: string): { value: string; isEncrypted: boolean } | undefined {
@@ -55,10 +57,12 @@ export function getModels() {
   return {
     sentence: read(SETTING_KEYS.sentenceModel)?.value || DEFAULT_MODELS.sentence,
     helper: read(SETTING_KEYS.helperModel)?.value || DEFAULT_MODELS.helper,
+    audit: read(SETTING_KEYS.auditModel)?.value || DEFAULT_MODELS.audit,
   };
 }
 
-export function setModels(models: { sentence: string; helper: string }) {
+export function setModels(models: { sentence: string; helper: string; audit: string }) {
   write(SETTING_KEYS.sentenceModel, models.sentence);
   write(SETTING_KEYS.helperModel, models.helper);
+  write(SETTING_KEYS.auditModel, models.audit);
 }
