@@ -8,6 +8,7 @@ import { complete, testConnection } from "@/lib/ai/openrouter";
 import { auditReviewMessages } from "@/lib/ai/prompts";
 import { formatAuditTranscript, loadAuditEvents, parseAuditKind, parseAuditStudentId, parseAuditWindow } from "@/lib/audit";
 import { destroyAllSessionsForUser, requireAdmin } from "@/lib/auth";
+import { isGradeLevel } from "@/lib/grade";
 import { hashPassword, MIN_PASSWORD_LENGTH } from "@/lib/password";
 import { clearApiKey as clearStoredKey, getModels, setApiKey, setModels } from "@/lib/settings";
 
@@ -19,7 +20,7 @@ function str(fd: FormData, key: string) {
 
 function parseGrade(fd: FormData): number | null {
   const n = Number(fd.get("gradeLevel"));
-  return Number.isInteger(n) && n >= 0 && n <= 8 ? n : null;
+  return Number.isInteger(n) && isGradeLevel(n) ? n : null;
 }
 
 function fail(error: string): ActionResult {
