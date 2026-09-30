@@ -68,21 +68,31 @@ function validateChapterRules(tokens: Token[], key: AnswerKey, spans: RawSpan[])
   const has = (id: string) => id in key;
   const subset = (inner: number[], outer: number[]) => inner.every((i) => outer.includes(i));
 
+  if (has("complete-subject") && !isContiguous(tokens, key["complete-subject"])) {
+    throw new AnswerKeyError("The complete subject must be one continuous group of words.");
+  }
+
   if (has("simple-subject") && has("complete-subject")) {
     if (!subset(key["simple-subject"], key["complete-subject"])) {
       throw new AnswerKeyError("The simple subject must be inside the complete subject.");
     }
-    if (!isContiguous(tokens, key["complete-subject"])) {
-      throw new AnswerKeyError("The complete subject must be one continuous group of words.");
-    }
   }
 
-  if (has("dependent-clause") && has("subordinating-conjunction")) {
+  if (has("dependent-clause")) {
     const clauseSpans = spans.filter((s) => s.label === "dependent-clause");
     if (clauseSpans.length !== 1) throw new AnswerKeyError("There must be exactly one dependent clause.");
     if (!isContiguous(tokens, key["dependent-clause"])) {
       throw new AnswerKeyError("The dependent clause must be one continuous group of words.");
     }
+  }
+
+  if (has("dependent-clause") && has("complete-subject")) {
+    if (key["complete-subject"].some((i) => key["dependent-clause"].includes(i))) {
+      throw new AnswerKeyError("The complete subject must belong to the independent clause, not the dependent clause.");
+    }
+  }
+
+  if (has("dependent-clause") && has("subordinating-conjunction")) {
     if (!subset(key["subordinating-conjunction"], key["dependent-clause"])) {
       throw new AnswerKeyError("The subordinating conjunction must be inside the dependent clause.");
     }
