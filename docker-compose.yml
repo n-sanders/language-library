@@ -5,10 +5,17 @@ services:
     container_name: language-library
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "3236:3000"
     env_file:
       - .env
     environment:
       DATABASE_PATH: /data/app.db
     volumes:
       - ./data:/data
+    networks:
+      - default
+      - web-core_default
+
+networks:
+  web-core_default:
+    external: true
