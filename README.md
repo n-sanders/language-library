@@ -14,11 +14,10 @@ Requires Node.js 22 or newer.
 
 ```powershell
 npm install
-npm run setup     # creates .env.local with a random APP_SECRET (only needed once)
 npm run dev       # http://localhost:3000
 ```
 
-Sign in as `admin` / `admin` (from `.env.local`). Then:
+Sign in as `admin` / `admin`. Then:
 
 1. Go to **Admin > AI settings**, paste your OpenRouter API key, and click **Test connection**.
 2. Go to **Admin > Students** and add a student.
@@ -41,8 +40,6 @@ the admin account is created if none exists.
 On the server, in a copy of this repo:
 
 ```bash
-cp .env.example .env
-# edit .env: set a long random APP_SECRET and a real ADMIN_PASSWORD
 mkdir -p data && sudo chown 1000:1000 data   # the container runs as the "node" user (uid 1000)
 docker compose up -d --build
 ```
@@ -60,12 +57,14 @@ production image before deploying.
 | Variable | Purpose |
 | --- | --- |
 | `DATABASE_PATH` | SQLite file path. Local default `./data/app.db`; Docker uses `/data/app.db`. |
-| `APP_SECRET` | Encrypts the OpenRouter API key stored in the database. If you change it, re-enter the key in admin settings. |
 | `ADMIN_USERNAME` / `ADMIN_PASSWORD` | Used only to create the admin account on first start. Change the password later in admin settings. |
 | `COOKIE_SECURE` | Set to `true` if you put the app behind HTTPS. Leave unset for plain HTTP on the LAN. |
 
-The OpenRouter API key and the models used for sentence writing and the helper chat are set in the admin UI, not in
-env files.
+None of these are required. Docker Compose sets `DATABASE_PATH` itself, and the admin account defaults to `admin` / `admin`.
+
+The OpenRouter API key is stored in the database and set in the admin UI. If a database from an older version still
+has that key encrypted, set `APP_SECRET` to the old value for one start so the app can save it in the clear, or paste
+the key again in **Admin > AI settings**.
 
 ## Backups
 

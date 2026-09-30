@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
-import { decrypt, encrypt } from "./crypto";
+import { decrypt } from "./crypto";
 
 export const SETTING_KEYS = {
   apiKey: "openrouter.api_key",
@@ -30,16 +30,20 @@ function write(key: string, value: string, isEncrypted = false) {
 export function getApiKey(): string | null {
   const row = read(SETTING_KEYS.apiKey);
   if (!row) return null;
+  if (!row.isEncrypted) return row.value;
+
   try {
-    return row.isEncrypted ? decrypt(row.value) : row.value;
+    const apiKey = decrypt(row.value);
+    write(SETTING_KEYS.apiKey, apiKey, false);
+    return apiKey;
   } catch {
-    console.error("[settings] Could not decrypt the OpenRouter key. Was APP_SECRET changed? Re-enter the key.");
+    console.error("[settings] Could not decrypt the OpenRouter key. Re-enter it in Admin > AI settings.");
     return null;
   }
 }
 
 export function setApiKey(apiKey: string) {
-  write(SETTING_KEYS.apiKey, encrypt(apiKey), true);
+  write(SETTING_KEYS.apiKey, apiKey, false);
 }
 
 export function clearApiKey() {
