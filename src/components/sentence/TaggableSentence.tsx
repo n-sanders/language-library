@@ -15,6 +15,7 @@ export function TaggableSentence({
   onToggle,
   feedback,
   readOnly,
+  celebrate,
 }: {
   tokens: Token[];
   labels: LabelDef[];
@@ -23,6 +24,7 @@ export function TaggableSentence({
   onToggle: (index: number) => void;
   feedback?: Map<number, TokenFeedback>;
   readOnly?: boolean;
+  celebrate?: boolean;
 }) {
   const tagSets = Object.fromEntries(labels.map((l) => [l.id, new Set(tags[l.id] ?? [])]));
   const active = labels.find((l) => l.id === activeId) ?? labels[0];
@@ -73,8 +75,11 @@ export function TaggableSentence({
             <span
               className={`rounded-md px-1 py-1.5 transition-colors ${ring} ${
                 readOnly ? "" : "group-hover:bg-amber-100"
-              }`}
-              style={activeTagged ? { backgroundColor: `${active.color}26` } : undefined}
+              } ${celebrate ? "word-hop" : ""}`}
+              style={{
+                backgroundColor: activeTagged ? `${active.color}26` : undefined,
+                animationDelay: celebrate ? `${i * 60}ms` : undefined,
+              }}
             >
               {token.text}
             </span>

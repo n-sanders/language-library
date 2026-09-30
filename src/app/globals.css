@@ -86,6 +86,31 @@ body {
   cursor: not-allowed;
 }
 
+@keyframes word-hop {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  35% {
+    transform: translateY(-16px) rotate(-4deg);
+  }
+  60% {
+    transform: translateY(0);
+  }
+  78% {
+    transform: translateY(-5px);
+  }
+}
+.word-hop {
+  display: inline-block;
+  animation: word-hop 0.7s ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .word-hop {
+    animation: none;
+  }
+}
+
 /* Bookshelf */
 .shelf-board {
   background: linear-gradient(180deg, #a86b3c 0%, #8a5530 45%, #6e4224 100%);

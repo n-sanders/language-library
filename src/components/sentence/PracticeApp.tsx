@@ -1,5 +1,6 @@
 "use client";
 
+import { motion } from "framer-motion";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Chapter } from "@/content/books";
@@ -11,6 +12,7 @@ import { ResultView } from "./ResultView";
 import { TaggableSentence, type TokenFeedback } from "./TaggableSentence";
 import { TopicPicker } from "./TopicPicker";
 import { useActivityTracker } from "./useActivityTracker";
+import { WritingLoader } from "./WritingLoader";
 
 type Exercise = { id: number; topic: string; tokens: Token[] };
 
@@ -142,9 +144,15 @@ export function PracticeApp({
             <h1 className="font-book text-3xl font-bold">{chapter.title}</h1>
           </div>
           {solvedCount > 0 && (
-            <p className="rounded-full bg-amber-200 px-3 py-1 text-sm font-semibold">
+            <motion.p
+              key={solvedCount}
+              className="rounded-full bg-amber-200 px-3 py-1 text-sm font-semibold"
+              initial={{ scale: 1.6, rotate: -8 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{ type: "spring", stiffness: 500, damping: 12 }}
+            >
               ⭐ {solvedCount} solved this session
-            </p>
+            </motion.p>
           )}
         </div>
 
@@ -161,11 +169,7 @@ export function PracticeApp({
               </button>
             </div>
 
-            {loading && (
-              <p className="animate-pulse py-10 text-center font-book text-2xl text-amber-800">
-                ✏️ Writing a sentence about {topic}...
-              </p>
-            )}
+            {loading && <WritingLoader topic={topic} />}
 
             {error && (
               <div className="rounded-lg bg-red-100 p-3 text-red-800">
@@ -188,6 +192,7 @@ export function PracticeApp({
                   onToggle={toggle}
                   feedback={feedback}
                   readOnly={done}
+                  celebrate={Boolean(result?.perfect)}
                 />
 
                 <LabelPalette

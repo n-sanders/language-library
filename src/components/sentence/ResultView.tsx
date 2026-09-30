@@ -2,6 +2,7 @@
 
 import type { LabelDef } from "@/content/books";
 import type { GradeResult, Token } from "@/lib/types";
+import { PerfectCelebration } from "./Celebration";
 
 export function ResultView({
   result,
@@ -14,13 +15,7 @@ export function ResultView({
 }) {
   const pct = result.total ? Math.round((result.score / result.total) * 100) : 0;
 
-  if (result.perfect) {
-    return (
-      <div className="rounded-xl border-2 border-emerald-400 bg-emerald-50 p-4 text-emerald-900">
-        <p className="text-2xl font-bold">🎉 Perfect! You found every one.</p>
-      </div>
-    );
-  }
+  if (result.perfect) return <PerfectCelebration />;
 
   return (
     <div className="flex flex-col gap-2 rounded-xl border-2 border-amber-300 bg-amber-50 p-4">
