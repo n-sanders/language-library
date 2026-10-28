@@ -3,11 +3,13 @@
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Chapter } from "@/content/books";
+import type { TaggingChapter } from "@/content/books";
 import type { AnswerKey, GradeResult, Token } from "@/lib/types";
-import { postJson } from "./api";
+import { GENERATE_TIMEOUT_MS, isGenerationFailure, postJson } from "./api";
+import { GenerationFallback } from "./GenerationFallback";
 import { HelperChat } from "./HelperChat";
 import { LabelPalette } from "./LabelPalette";
+import { ReportProblem } from "./ReportProblem";
 import { ResultView } from "./ResultView";
 import { TaggableSentence, type TokenFeedback } from "./TaggableSentence";
 import { TopicPicker } from "./TopicPicker";
@@ -16,7 +18,7 @@ import { WritingLoader } from "./WritingLoader";
 
 type Exercise = { id: number; topic: string; tokens: Token[] };
 
-const emptyTags = (chapter: Chapter) => Object.fromEntries(chapter.labels.map((l) => [l.id, [] as number[]]));
+const emptyTags = (chapter: TaggingChapter) => Object.fromEntries(chapter.labels.map((l) => [l.id, [] as number[]]));
 
 export function PracticeApp({
   bookSlug,
@@ -26,7 +28,7 @@ export function PracticeApp({
 }: {
   bookSlug: string;
   bookTitle: string;
-  chapter: Chapter;
+  chapter: TaggingChapter;
   studentName: string;
 }) {
   useActivityTracker(bookSlug, chapter.slug);
@@ -35,6 +37,7 @@ export function PracticeApp({
   const [exercise, setExercise] = useState<Exercise | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [generationFailed, setGenerationFailed] = useState(false);
   const [activeId, setActiveId] = useState(chapter.labels[0].id);
   const [tags, setTags] = useState<Record<string, number[]>>(() => emptyTags(chapter));
   const [result, setResult] = useState<GradeResult | null>(null);
@@ -50,21 +53,23 @@ export function PracticeApp({
       setTopic(nextTopic);
       setLoading(true);
       setError(null);
+      setGenerationFailed(false);
       setExercise(null);
       setResult(null);
       setRevealedKey(null);
       setTags(emptyTags(chapter));
       setActiveId(chapter.labels[0].id);
       try {
-        const ex = await postJson<Exercise>("/api/exercises", {
-          book: bookSlug,
-          chapter: chapter.slug,
-          topic: nextTopic,
-        });
+        const ex = await postJson<Exercise>(
+          "/api/exercises",
+          { book: bookSlug, chapter: chapter.slug, topic: nextTopic },
+          { timeoutMs: GENERATE_TIMEOUT_MS },
+        );
         setExercise(ex);
         startedAt.current = Date.now();
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong.");
+        if (isGenerationFailure(err)) setGenerationFailed(true);
+        else setError(err instanceof Error ? err.message : "Something went wrong.");
       } finally {
         setLoading(false);
       }
@@ -171,6 +176,10 @@ export function PracticeApp({
 
             {loading && <WritingLoader topic={topic} />}
 
+            {generationFailed && !loading && (
+              <GenerationFallback topic={topic} onPickTopic={() => setTopic(null)} onRetry={() => loadSentence(topic)} />
+            )}
+
             {error && (
               <div className="rounded-lg bg-red-100 p-3 text-red-800">
                 {error}
@@ -244,70 +253,11 @@ export function PracticeApp({
         <HelperChat
           key={exercise?.id ?? "none"}
           exerciseId={exercise?.id ?? null}
-          labels={chapter.labels}
-          activeId={activeId}
+          focusId={activeId}
+          focusName={(chapter.labels.find((l) => l.id === activeId) ?? chapter.labels[0]).name.toLowerCase()}
           studentName={studentName}
         />
       </aside>
     </main>
-  );
-}
-
-function ReportProblem({ exerciseId }: { exerciseId: number }) {
-  const [open, setOpen] = useState(false);
-  const [note, setNote] = useState("");
-  const [state, setState] = useState<"idle" | "sending" | "sent" | "error">("idle");
-
-  useEffect(() => {
-    setOpen(false);
-    setNote("");
-    setState("idle");
-  }, [exerciseId]);
-
-  if (state === "sent") return <span className="text-sm text-emerald-700">Thanks! A grown-up will take a look.</span>;
-
-  if (!open) {
-    return (
-      <button type="button" className="ml-auto text-sm text-stone-500 underline underline-offset-4" onClick={() => setOpen(true)}>
-        Report a problem
-      </button>
-    );
-  }
-
-  return (
-    <form
-      className="flex w-full flex-col gap-2 rounded-lg border border-stone-300 bg-stone-50 p-3"
-      onSubmit={async (e) => {
-        e.preventDefault();
-        setState("sending");
-        try {
-          await postJson(`/api/exercises/${exerciseId}/report`, { note });
-          setState("sent");
-        } catch {
-          setState("error");
-        }
-      }}
-    >
-      <label className="text-sm font-semibold" htmlFor="report-note">
-        What looks wrong with this sentence or its answer?
-      </label>
-      <textarea
-        id="report-note"
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
-        rows={2}
-        maxLength={1000}
-        className="input"
-      />
-      <div className="flex gap-2">
-        <button type="submit" className="btn-primary text-sm" disabled={state === "sending"}>
-          Send report
-        </button>
-        <button type="button" className="btn-secondary text-sm" onClick={() => setOpen(false)}>
-          Cancel
-        </button>
-        {state === "error" && <span className="text-sm text-red-700">Couldn&apos;t send. Try again.</span>}
-      </div>
-    </form>
   );
 }

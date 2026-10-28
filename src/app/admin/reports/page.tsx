@@ -3,7 +3,7 @@ import Link from "next/link";
 import { getDb, schema } from "@/db";
 import { chapterTitle, getChapter } from "@/content/books";
 import { formatDateTime } from "@/lib/format";
-import { describeKey } from "@/lib/keyDisplay";
+import { AnswerKeyView } from "@/components/admin/AnswerKeyView";
 import { setReportStatus } from "../actions";
 
 export default async function ReportsPage() {
@@ -48,18 +48,7 @@ export default async function ReportsPage() {
               </div>
               <p className="mt-1 font-book text-lg">{exercise.sentence}</p>
               {report.note && <p className="mt-1 text-sm italic">&quot;{report.note}&quot;</p>}
-              {chapter && (
-                <ul className="mt-2 text-sm">
-                  {describeKey(chapter.labels, exercise.tokensJson, exercise.answerKeyJson).map(({ label, parts }) => (
-                    <li key={label.id}>
-                      <span className="font-semibold" style={{ color: label.color }}>
-                        {label.name}:
-                      </span>{" "}
-                      {parts.join(" / ") || "-"}
-                    </li>
-                  ))}
-                </ul>
-              )}
+              {chapter && <AnswerKeyView chapter={chapter} exercise={exercise} />}
               <div className="mt-3 flex gap-2">
                 {report.status === "open" ? (
                   <>

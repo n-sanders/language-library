@@ -52,8 +52,24 @@ export async function complete(opts: {
   messages: ChatMessage[];
   temperature?: number;
   jsonSchema?: JsonSchemaFormat;
+  /** Whole-call limit, including the plain-JSON fallback request. */
+  timeoutMs?: number;
 }): Promise<string> {
   const apiKey = requireKey();
+  const signal = AbortSignal.timeout(opts.timeoutMs ?? 20_000);
+  try {
+    return await completeWithSignal(apiKey, opts, signal);
+  } catch (err) {
+    if (signal.aborted) throw new OpenRouterError(504, "The AI took too long to answer.");
+    throw err;
+  }
+}
+
+async function completeWithSignal(
+  apiKey: string,
+  opts: { model: string; messages: ChatMessage[]; temperature?: number; jsonSchema?: JsonSchemaFormat },
+  signal: AbortSignal,
+): Promise<string> {
   const body: Record<string, unknown> = {
     model: opts.model,
     messages: opts.messages,
@@ -70,6 +86,7 @@ export async function complete(opts: {
     method: "POST",
     headers: headers(apiKey),
     body: JSON.stringify(body),
+    signal,
   });
 
   // Some models reject structured outputs; fall back to plain JSON-in-text.
@@ -79,6 +96,7 @@ export async function complete(opts: {
       method: "POST",
       headers: headers(apiKey),
       body: JSON.stringify(body),
+      signal,
     });
   }
 

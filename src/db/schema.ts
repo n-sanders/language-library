@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { DIAGRAM_MODES, type DiagramNode } from "../lib/diagram/types";
 import type { AnswerKey, StudentAnswer, Token } from "@/lib/types";
 
 const createdAt = () =>
@@ -65,6 +66,8 @@ export const exercises = sqliteTable(
     sentence: text("sentence").notNull(),
     tokensJson: text("tokens_json", { mode: "json" }).$type<Token[]>().notNull(),
     answerKeyJson: text("answer_key_json", { mode: "json" }).$type<AnswerKey>().notNull(),
+    /** Reed-Kellogg answer diagram, only for diagramming chapters. */
+    diagramJson: text("diagram_json", { mode: "json" }).$type<DiagramNode[]>(),
     model: text("model").notNull(),
     revealedAt: integer("revealed_at", { mode: "timestamp" }),
     createdAt: createdAt(),
@@ -87,6 +90,8 @@ export const attempts = sqliteTable(
     total: integer("total").notNull(),
     hintsUsed: integer("hints_used").notNull().default(0),
     durationS: integer("duration_s").notNull().default(0),
+    /** Scaffolding mode for diagramming attempts. */
+    mode: text("mode", { enum: DIAGRAM_MODES }),
     createdAt: createdAt(),
   },
   (t) => [index("attempts_exercise_idx").on(t.exerciseId), index("attempts_user_idx").on(t.userId)],

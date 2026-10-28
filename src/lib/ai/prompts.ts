@@ -1,10 +1,10 @@
-import type { Chapter } from "@/content/books";
+import type { TaggingChapter } from "@/content/books";
 import { gradeGuidance, gradeLabel } from "@/lib/grade";
 import { detokenize } from "@/lib/tokenize";
 import type { AnswerKey, Token } from "@/lib/types";
 import type { ChatMessage } from "./openrouter";
 
-export function sentenceSchema(chapter: Chapter) {
+export function sentenceSchema(chapter: TaggingChapter) {
   return {
     name: "practice_sentence",
     schema: {
@@ -31,7 +31,7 @@ export function sentenceSchema(chapter: Chapter) {
 }
 
 export function sentenceMessages(opts: {
-  chapter: Chapter;
+  chapter: TaggingChapter;
   topic: string;
   gradeLevel: number;
   avoid: string[];
@@ -79,7 +79,7 @@ export function sentenceMessages(opts: {
 }
 
 export function helperSystemPrompt(opts: {
-  chapter: Chapter;
+  chapter: TaggingChapter;
   tokens: Token[];
   key: AnswerKey;
   gradeLevel: number;

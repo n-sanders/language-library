@@ -1,27 +1,36 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { LabelDef } from "@/content/books";
+import type { DiagramMode, DraftNode } from "@/lib/diagram/types";
 
 type Message = { role: "user" | "assistant"; content: string };
 
+export type HelperDiagram = {
+  nodes: DraftNode[];
+  mode: DiagramMode;
+  selectedId: string | null;
+};
+
+/** `focusName` is what the student is working on right now (a label or diagram part), in lower case. */
 export function HelperChat({
   exerciseId,
-  labels,
-  activeId,
+  focusId,
+  focusName,
   studentName,
+  diagram,
 }: {
   exerciseId: number | null;
-  labels: LabelDef[];
-  activeId: string;
+  focusId?: string;
+  focusName: string;
   studentName: string;
+  /** Current sentence diagram, sent with each question so Hoot can see the student's work. */
+  diagram?: HelperDiagram;
 }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const active = labels.find((l) => l.id === activeId) ?? labels[0];
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -39,7 +48,7 @@ export function HelperChat({
       const res = await fetch("/api/helper", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ exerciseId, message, focusLabelId: activeId }),
+        body: JSON.stringify({ exerciseId, message, focusLabelId: focusId, diagram }),
       });
       if (!res.ok || !res.body) {
         const data = await res.json().catch(() => ({}));
@@ -68,9 +77,9 @@ export function HelperChat({
   };
 
   const suggestions = [
-    `How do I find the ${active.name.toLowerCase()}?`,
+    `How do I find the ${focusName}?`,
     "Can I have a hint?",
-    `What is a ${active.name.toLowerCase()}?`,
+    `What is a ${focusName}?`,
   ];
 
   return (
@@ -88,7 +97,7 @@ export function HelperChat({
       <div ref={scrollRef} className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
         <Bubble role="assistant">
           {exerciseId
-            ? `Hi ${studentName}! Stuck on the ${active.name.toLowerCase()}? Ask me and I'll help you figure it out.`
+            ? `Hi ${studentName}! Stuck on the ${focusName}? Ask me and I'll help you figure it out.`
             : "Pick a topic to get a sentence, and I'll be here if you need help!"}
         </Bubble>
         {messages.map((m, i) => (

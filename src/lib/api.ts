@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { HttpError } from "./auth";
 
-export function jsonError(status: number, message: string) {
-  return NextResponse.json({ error: message }, { status });
+export function jsonError(status: number, message: string, code?: string) {
+  return NextResponse.json(code ? { error: message, code } : { error: message }, { status });
 }
 
 /** Wraps a route handler so thrown HttpErrors and validation errors become JSON responses. */

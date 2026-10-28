@@ -1,8 +1,8 @@
-import type { Chapter } from "@/content/books";
+import type { TaggingChapter } from "@/content/books";
 import type { AnswerKey, GradeResult, LabelResult, StudentAnswer, Token } from "./types";
 
 /** Keeps only valid, taggable token indices for the chapter's labels. */
-export function cleanAnswer(chapter: Chapter, tokens: Token[], answer: StudentAnswer): StudentAnswer {
+export function cleanAnswer(chapter: TaggingChapter, tokens: Token[], answer: StudentAnswer): StudentAnswer {
   const cleaned: StudentAnswer = {};
   for (const label of chapter.labels) {
     const raw = Array.isArray(answer[label.id]) ? answer[label.id] : [];
@@ -16,7 +16,7 @@ export function cleanAnswer(chapter: Chapter, tokens: Token[], answer: StudentAn
  * Word-level grading per label. Each key word is worth a point, and each extra
  * word the student tagged adds to the total so guessing everything doesn't pay off.
  */
-export function grade(chapter: Chapter, key: AnswerKey, answer: StudentAnswer): GradeResult {
+export function grade(chapter: TaggingChapter, key: AnswerKey, answer: StudentAnswer): GradeResult {
   const labels: LabelResult[] = chapter.labels.map((label) => {
     const expected = new Set(key[label.id] ?? []);
     const given = answer[label.id] ?? [];

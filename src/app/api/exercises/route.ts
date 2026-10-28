@@ -2,12 +2,15 @@ import { and, desc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getDb, schema } from "@/db";
-import { getChapter } from "@/content/books";
+import { getChapter, isDiagramChapter } from "@/content/books";
 import { sanitizeTopic } from "@/content/topics";
 import { generateSentence } from "@/lib/ai/generate";
+import { generateDiagram } from "@/lib/ai/generateDiagram";
 import { AiNotConfiguredError } from "@/lib/ai/openrouter";
+import { GenerationFailedError } from "@/lib/ai/retry";
 import { handle, jsonError } from "@/lib/api";
 import { requireApiUser } from "@/lib/auth";
+import { structureOf } from "@/lib/diagram/skeleton";
 
 const bodySchema = z.object({
   book: z.string(),
@@ -40,13 +43,13 @@ export const POST = handle(async (req: Request) => {
     .all()
     .map((r) => r.sentence);
 
+  const { chapter } = found;
   try {
-    const generated = await generateSentence({
-      chapter: found.chapter,
-      topic,
-      gradeLevel: user.gradeLevel,
-      avoid,
-    });
+    const opts = { topic, gradeLevel: user.gradeLevel, avoid };
+    const generated = isDiagramChapter(chapter)
+      ? await generateDiagram({ chapter, ...opts })
+      : { ...(await generateSentence({ chapter, ...opts })), nodes: null };
+    const { nodes } = generated;
 
     const row = db
       .insert(schema.exercises)
@@ -58,14 +61,21 @@ export const POST = handle(async (req: Request) => {
         sentence: generated.sentence,
         tokensJson: generated.tokens,
         answerKeyJson: generated.key,
+        diagramJson: nodes,
         model: generated.model,
       })
       .returning({ id: schema.exercises.id })
       .get();
 
-    return NextResponse.json({ id: row.id, topic, tokens: generated.tokens });
+    return NextResponse.json({
+      id: row.id,
+      topic,
+      tokens: generated.tokens,
+      ...(nodes ? { structure: structureOf(nodes) } : {}),
+    });
   } catch (err) {
     if (err instanceof AiNotConfiguredError) return jsonError(503, err.message);
+    if (err instanceof GenerationFailedError) return jsonError(422, err.message, "generation_failed");
     throw err;
   }
 });

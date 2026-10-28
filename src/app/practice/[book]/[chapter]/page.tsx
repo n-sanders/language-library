@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { DiagramPracticeApp } from "@/components/diagram/DiagramPracticeApp";
 import { PracticeApp } from "@/components/sentence/PracticeApp";
 import { SiteHeader } from "@/components/SiteHeader";
-import { getBook, getChapter } from "@/content/books";
+import { getBook, getChapter, isDiagramChapter } from "@/content/books";
 import { requireUser } from "@/lib/auth";
 
 export async function generateMetadata({ params }: { params: Promise<{ book: string; chapter: string }> }) {
@@ -37,12 +38,16 @@ export default async function PracticePage({ params }: { params: Promise<{ book:
   return (
     <div className="paper min-h-screen">
       <SiteHeader user={user} />
-      <PracticeApp
-        bookSlug={book.slug}
-        bookTitle={book.title}
-        chapter={found.chapter}
-        studentName={user.displayName}
-      />
+      {isDiagramChapter(found.chapter) ? (
+        <DiagramPracticeApp
+          bookSlug={book.slug}
+          bookTitle={book.title}
+          chapter={found.chapter}
+          studentName={user.displayName}
+        />
+      ) : (
+        <PracticeApp bookSlug={book.slug} bookTitle={book.title} chapter={found.chapter} studentName={user.displayName} />
+      )}
     </div>
   );
 }

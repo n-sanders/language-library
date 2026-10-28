@@ -1,4 +1,4 @@
-import type { Chapter } from "@/content/books";
+import type { TaggingChapter } from "@/content/books";
 import { normalizeWord, tokenize } from "@/lib/tokenize";
 import type { AnswerKey, Token } from "@/lib/types";
 
@@ -40,7 +40,7 @@ function isContiguous(tokens: Token[], indices: number[]): boolean {
  * Maps the model's text spans onto our own tokenization and checks the key is usable.
  * Throws AnswerKeyError with a reason the retry prompt can use.
  */
-export function buildAnswerKey(chapter: Chapter, sentence: string, spans: RawSpan[]): { tokens: Token[]; key: AnswerKey } {
+export function buildAnswerKey(chapter: TaggingChapter, sentence: string, spans: RawSpan[]): { tokens: Token[]; key: AnswerKey } {
   const tokens = tokenize(sentence);
   if (tokens.filter((t) => t.isWord).length < 3) throw new AnswerKeyError("The sentence is too short.");
 

@@ -7,11 +7,17 @@ import { GradeSelect } from "@/components/admin/GradeSelect";
 import { BOOKS, chapterTitle, getChapter } from "@/content/books";
 import { formatDateTime, formatDuration, formatPercent } from "@/lib/format";
 import { gradeLabel } from "@/lib/grade";
-import { describeKey } from "@/lib/keyDisplay";
+import { AnswerKeyView } from "@/components/admin/AnswerKeyView";
 import { getProgress, MASTERY_WINDOW, progressKey } from "@/lib/progress";
 import { changeUsername, resetPassword, updateStudent } from "../../actions";
 
 const RECENT_LIMIT = 30;
+
+/** "guided mode" or "supported → independent" for a sentence's tries, oldest first. */
+function modeSummary(modes: (string | null)[]): string {
+  const distinct = modes.filter((m): m is string => Boolean(m)).filter((m, i, all) => i === 0 || all[i - 1] !== m);
+  return distinct.length === 1 ? `${distinct[0]} mode` : `modes ${distinct.join(" → ")}`;
+}
 
 export default async function StudentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -132,24 +138,14 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
                         ? "not attempted"
                         : `first try ${formatPercent(first.total ? first.score / first.total : 0)} · best ${formatPercent(best)} · ${tries.length} ${tries.length === 1 ? "try" : "tries"}`}
                       {ex.revealedAt && " · answer shown"}
+                      {tries.some((a) => a.mode) && ` · ${modeSummary(tries.map((a) => a.mode))}`}
                       {messages.length > 0 && ` · ${messages.filter((m) => m.role === "user").length} helper questions`}
                     </span>
                   </div>
                   <p className="mt-1 font-book text-lg">{ex.sentence}</p>
                   <details className="mt-2 text-sm">
                     <summary className="cursor-pointer text-amber-800">Answer key and helper chat</summary>
-                    {chapter && (
-                      <ul className="mt-2 flex flex-col gap-0.5">
-                        {describeKey(chapter.labels, ex.tokensJson, ex.answerKeyJson).map(({ label, parts }) => (
-                          <li key={label.id}>
-                            <span className="font-semibold" style={{ color: label.color }}>
-                              {label.name}:
-                            </span>{" "}
-                            {parts.join(" / ") || "-"}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
+                    {chapter && <AnswerKeyView chapter={chapter} exercise={ex} />}
                     {messages.length > 0 ? (
                       <div className="mt-3 flex flex-col gap-1.5 rounded-lg bg-stone-50 p-3">
                         {messages.map((m) => (

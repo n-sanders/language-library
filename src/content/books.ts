@@ -1,3 +1,6 @@
+import type { DiagramFeature, DiagramNode } from "@/lib/diagram/types";
+import { DIAGRAMMING_BOOK } from "./diagramBook";
+
 export type LabelDef = {
   id: string;
   name: string;
@@ -9,23 +12,45 @@ export type LabelDef = {
   color: string;
 };
 
-export type Chapter = {
+type ChapterBase = {
   slug: string;
   title: string;
   summary: string;
-  labels: LabelDef[];
   /** Extra rules the sentence generator must follow for this chapter. */
   generationRules: string[];
 };
+
+export type TaggingChapter = ChapterBase & {
+  kind: "tagging";
+  labels: LabelDef[];
+};
+
+export type DiagramExample = { sentence: string; nodes: DiagramNode[] };
+
+export type DiagramChapter = ChapterBase & {
+  kind: "diagram";
+  /** Hand-diagrammed sample sentences shown in the "See an example" card. */
+  examples: DiagramExample[];
+  /** Diagram elements this chapter may use (earlier chapters' elements included). */
+  features: DiagramFeature[];
+  /** Each group lists alternatives; every generated sentence must use at least one feature from each group. */
+  required: DiagramFeature[][];
+};
+
+export type Chapter = TaggingChapter | DiagramChapter;
 
 export type Book = {
   slug: string;
   title: string;
   subtitle: string;
+  kind: "tagging" | "diagram";
   status: "available" | "coming-soon";
   spine: { color: string; accent: string; height: number; width: number };
   chapters: Chapter[];
 };
+
+export const isDiagramChapter = (chapter: Chapter): chapter is DiagramChapter => chapter.kind === "diagram";
+export const isTaggingChapter = (chapter: Chapter): chapter is TaggingChapter => chapter.kind === "tagging";
 
 const L = {
   completeSubject: {
@@ -98,10 +123,12 @@ export const BOOKS: Book[] = [
     slug: "sentence-parts",
     title: "Parts of a Sentence",
     subtitle: "Find the pieces that build a sentence",
+    kind: "tagging",
     status: "available",
     spine: { color: "#1e3a8a", accent: "#fbbf24", height: 260, width: 64 },
     chapters: [
       {
+        kind: "tagging",
         slug: "subject",
         title: "The Subject",
         summary: "Find who or what the sentence is about.",
@@ -114,6 +141,7 @@ export const BOOKS: Book[] = [
         ],
       },
       {
+        kind: "tagging",
         slug: "nouns-verbs",
         title: "Nouns & Verbs",
         summary: "Spot the naming words and the action words.",
@@ -126,6 +154,7 @@ export const BOOKS: Book[] = [
         ],
       },
       {
+        kind: "tagging",
         slug: "adjectives-adverbs",
         title: "Adjectives & Adverbs",
         summary: "Find the words that describe.",
@@ -138,6 +167,7 @@ export const BOOKS: Book[] = [
         ],
       },
       {
+        kind: "tagging",
         slug: "phrases-clauses",
         title: "Phrases & Clauses",
         summary: "Prepositional phrases, dependent clauses, and the words that start them.",
@@ -151,6 +181,7 @@ export const BOOKS: Book[] = [
         ],
       },
       {
+        kind: "tagging",
         slug: "putting-it-together",
         title: "Putting It All Together",
         summary: "Find every part you've learned in one sentence.",
@@ -179,10 +210,12 @@ export const BOOKS: Book[] = [
       },
     ],
   },
+  DIAGRAMMING_BOOK,
   {
     slug: "spelling",
     title: "Spelling",
     subtitle: "Word lists and spelling practice",
+    kind: "tagging",
     status: "coming-soon",
     spine: { color: "#166534", accent: "#fde68a", height: 230, width: 56 },
     chapters: [],

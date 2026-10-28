@@ -2,9 +2,14 @@ import { and, asc, count, eq, gt } from "drizzle-orm";
 import { z } from "zod";
 import { getDb, schema } from "@/db";
 import { AiNotConfiguredError, stream, type ChatMessage } from "@/lib/ai/openrouter";
+import { isDiagramChapter } from "@/content/books";
+import { diagramHelperPrompt } from "@/lib/ai/diagramPrompts";
 import { helperSystemPrompt } from "@/lib/ai/prompts";
 import { handle, jsonError } from "@/lib/api";
 import { requireApiUser } from "@/lib/auth";
+import { describeStudentDiagram } from "@/lib/diagram/describe";
+import { CLAUSE_KINDS, DIAGRAM_MODES, DIAGRAM_ROLES, JOINABLE_ROLES } from "@/lib/diagram/types";
+import { sanitizeDraft } from "@/lib/diagram/validate";
 import { loadOwnExercise } from "@/lib/exercises";
 import { getApiKey, getModels } from "@/lib/settings";
 
@@ -12,10 +17,28 @@ const RATE_LIMIT_MESSAGES = 20;
 const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
 const HISTORY_LIMIT = 16;
 
+const draftNodeSchema = z.object({
+  id: z.string().min(1).max(40),
+  role: z.enum(DIAGRAM_ROLES),
+  words: z.array(z.number().int()).max(12),
+  parent: z.string().max(40).nullable(),
+  clauseKind: z.enum(CLAUSE_KINDS).optional(),
+  joins: z.enum(JOINABLE_ROLES).optional(),
+  implied: z.literal("you").optional(),
+  fixed: z.boolean().optional(),
+});
+
 const bodySchema = z.object({
   exerciseId: z.number().int(),
   message: z.string().trim().min(1).max(500),
-  focusLabelId: z.string().optional(),
+  focusLabelId: z.string().max(60).optional(),
+  diagram: z
+    .object({
+      nodes: z.array(draftNodeSchema).max(100),
+      mode: z.enum(DIAGRAM_MODES),
+      selectedId: z.string().max(40).nullable().optional(),
+    })
+    .optional(),
 });
 
 export const POST = handle(async (req: Request) => {
@@ -48,19 +71,37 @@ export const POST = handle(async (req: Request) => {
     .all()
     .slice(-HISTORY_LIMIT);
 
-  const messages: ChatMessage[] = [
-    {
-      role: "system",
-      content: helperSystemPrompt({
+  const answerRevealed = Boolean(exercise.revealedAt);
+  const studentLines =
+    isDiagramChapter(chapter) && body.diagram
+      ? describeStudentDiagram(exercise.tokensJson, sanitizeDraft(exercise.tokensJson, body.diagram.nodes), {
+          mode: body.diagram.mode,
+          selectedId: body.diagram.selectedId,
+        })
+      : undefined;
+  const system = isDiagramChapter(chapter)
+    ? diagramHelperPrompt({
+        chapter,
+        tokens: exercise.tokensJson,
+        nodes: exercise.diagramJson ?? [],
+        gradeLevel: user.gradeLevel,
+        studentName: user.displayName,
+        focus: body.focusLabelId,
+        answerRevealed,
+        studentLines,
+      })
+    : helperSystemPrompt({
         chapter,
         tokens: exercise.tokensJson,
         key: exercise.answerKeyJson,
         gradeLevel: user.gradeLevel,
         studentName: user.displayName,
         focusLabelId: body.focusLabelId,
-        answerRevealed: Boolean(exercise.revealedAt),
-      }),
-    },
+        answerRevealed,
+      });
+
+  const messages: ChatMessage[] = [
+    { role: "system", content: system },
     ...history,
     { role: "user", content: body.message },
   ];
