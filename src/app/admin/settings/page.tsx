@@ -1,8 +1,8 @@
 import { ActionForm, Field } from "@/components/admin/ActionForm";
 import { listModels, type ModelInfo } from "@/lib/ai/openrouter";
 import { requireAdmin } from "@/lib/auth";
-import { getApiKeyHint, getModels } from "@/lib/settings";
-import { removeApiKey, resetPassword, runConnectionTest, saveApiKey, saveModels } from "../actions";
+import { getApiKeyHint, getModels, stockSentencesEnabled, stockSentencesSetting } from "@/lib/settings";
+import { removeApiKey, resetPassword, runConnectionTest, saveApiKey, saveModels, saveStockSentences } from "../actions";
 
 function priceLabel(m: ModelInfo) {
   if (m.promptPrice === null) return m.name;
@@ -14,6 +14,8 @@ export default async function SettingsPage() {
   const admin = await requireAdmin();
   const hint = getApiKeyHint();
   const models = getModels();
+  const stockOn = stockSentencesSetting();
+  const stockForced = process.env.STOCK_SENTENCES === "1";
 
   let available: ModelInfo[] = [];
   let modelsError: string | null = null;
@@ -98,6 +100,23 @@ export default async function SettingsPage() {
             buttonClassName="btn-secondary"
           />
         </div>
+      </section>
+
+      <section className="rounded-xl border border-stone-200 bg-white p-6">
+        <h2 className="text-lg font-bold">Sample sentences</h2>
+        <p className="mb-4 text-sm text-stone-600">
+          Diagram practice uses each chapter&apos;s hand-built examples instead of the sentence writer. The helper still
+          uses the model. Set <code>STOCK_SENTENCES=1</code> to turn this on without saving it here.
+          {stockForced && stockSentencesEnabled() && (
+            <span className="block text-amber-800">Sample sentences are on because STOCK_SENTENCES=1.</span>
+          )}
+        </p>
+        <ActionForm action={saveStockSentences} submitLabel="Save">
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" name="stockSentences" defaultChecked={stockOn || stockForced} />
+            Use sample sentences for diagramming
+          </label>
+        </ActionForm>
       </section>
 
       <section className="rounded-xl border border-stone-200 bg-white p-6">

@@ -1,6 +1,8 @@
 import type { Token } from "@/lib/types";
-import { DiagramIndex, inSentenceOrder } from "./tree";
-import { ROLE_NAMES, type DiagramMode, type DiagramNode } from "./types";
+import { COMPLEMENT_ROLES, DiagramIndex, inSentenceOrder } from "./tree";
+import { ROLE_NAMES, type DiagramMode, type DiagramNode, type DiagramRole } from "./types";
+
+const DETAIL_ROLES: DiagramRole[] = ["modifier", "preposition", "prep-object", "indirect-object", ...COMPLEMENT_ROLES];
 
 export function nodeText(tokens: Token[], node: DiagramNode): string {
   if (node.implied) return "(you)";
@@ -14,7 +16,10 @@ export function describeDiagram(tokens: Token[], nodes: DiagramNode[]): string[]
   const index = new DiagramIndex(nodes);
 
   const describe = (node: DiagramNode, depth: number): string => {
-    const kids = depth > 8 ? [] : inSentenceOrder(index.children(node.id, "modifier", "preposition", "prep-object"));
+    if (node.role === "modifier" && node.modifies) {
+      return `modifier "${nodeText(tokens, node) || "_"}" of the compound ${ROLE_NAMES[node.modifies]}s`;
+    }
+    const kids = depth > 8 ? [] : inSentenceOrder(index.children(node.id, ...DETAIL_ROLES));
     const own = `${node.role === "conjunction" ? `conjunction joining ${node.joins === "clause" ? "the clauses" : `the ${node.joins}s`}` : ROLE_NAMES[node.role]} "${nodeText(tokens, node) || "_"}"`;
     return kids.length ? `${own} (${kids.map((k) => describe(k, depth + 1)).join("; ")})` : own;
   };
@@ -40,7 +45,9 @@ function nodePhrase(tokens: Token[], node: DiagramNode): string {
   const name =
     node.role === "conjunction"
       ? `conjunction joining ${node.joins === "clause" ? "the clauses" : `the ${node.joins ?? "?"}s`}`
-      : ROLE_NAMES[node.role];
+      : node.role === "modifier" && node.modifies
+        ? `modifier of the compound ${ROLE_NAMES[node.modifies]}s`
+        : ROLE_NAMES[node.role];
   const text = nodeText(tokens, node);
   return text ? `${name} "${text}"` : `empty ${name} line`;
 }
@@ -54,7 +61,7 @@ function outlinedNodeIds(nodes: DiagramNode[]): Set<string> {
     if (seen.has(node.id)) return;
     seen.add(node.id);
     if (depth > 8) return;
-    for (const kid of index.children(node.id, "modifier", "preposition", "prep-object")) visit(kid, depth + 1);
+    for (const kid of index.children(node.id, ...DETAIL_ROLES)) visit(kid, depth + 1);
   };
 
   for (const clause of nodes.filter((n) => n.role === "clause")) {

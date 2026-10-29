@@ -144,56 +144,177 @@ function layoutIndirect(ctx: Ctx, io: DraftNode, sx: number, sy: number): Ext {
   return { right: Math.max(ex, r.right), bottom: Math.max(ey, r.bottom), top: sy };
 }
 
-/** One baseline position: a single word, or a fork for a compound part. */
+type Placed = Ext & { lineEnd: number };
+
+/** Modifiers that describe every member of a compound owned by `parentId`. */
+function sharedMods(ctx: Ctx, parentId: string, role: JoinableRole): DraftNode[] {
+  return inSentenceOrder(ctx.index.children(parentId, "modifier").filter((m) => m.modifies === role));
+}
+
+/** Slant modifiers down from a baseline stem. Returns the stem's far end. */
+function layoutStemMods(ctx: Ctx, mods: DraftNode[], x: number, y: number): Placed {
+  if (mods.length === 0) return { right: x, bottom: y, top: y - WORD_H, lineEnd: x };
+  let cx = x + 12;
+  let right = x;
+  let bottom = y;
+  if (guard(ctx)) {
+    ctx.depth++;
+    for (const mod of mods) {
+      const r = layoutSlant(ctx, mod, cx, y);
+      right = Math.max(right, r.right);
+      bottom = Math.max(bottom, r.bottom);
+      cx = r.right + GAP;
+    }
+    ctx.depth--;
+  }
+  const lineEnd = Math.max(right, cx);
+  seg(ctx, x, y, lineEnd, y);
+  return { right: lineEnd, bottom, top: y - WORD_H, lineEnd };
+}
+
+/** Indirect objects hanging from a single stem after a closed verb fork. */
+function layoutStemIndirects(ctx: Ctx, ios: DraftNode[], x: number, y: number): Placed {
+  let cx = x + 18;
+  let right = x;
+  let bottom = y;
+  if (guard(ctx)) {
+    ctx.depth++;
+    for (const io of ios) {
+      const r = layoutIndirect(ctx, io, cx, y);
+      right = Math.max(right, r.right);
+      bottom = Math.max(bottom, r.bottom);
+      cx = r.right + GAP;
+    }
+    ctx.depth--;
+  }
+  const lineEnd = Math.max(right, cx);
+  seg(ctx, x, y, lineEnd, y);
+  return { right: lineEnd, bottom, top: y - WORD_H, lineEnd };
+}
+
+/** Complements that belong to one clause or one verb, drawn to the right of `x`. */
+function layoutComplementRun(ctx: Ctx, ownerId: string, x: number, y: number): Placed {
+  let cur = x;
+  let bottom = y;
+  let top = y - WORD_H;
+  for (const role of COMPLEMENT_ROLES) {
+    const items = inSentenceOrder(ctx.index.children(ownerId, role));
+    if (items.length === 0) continue;
+    let start = cur;
+    if (role === "direct-object") {
+      seg(ctx, cur, y - 34, cur, y);
+    } else {
+      seg(ctx, cur, y - 34, cur + 16, y);
+      seg(ctx, cur, y, cur + 16, y);
+      start = cur + 16;
+    }
+    const stem = layoutStemMods(ctx, sharedMods(ctx, ownerId, role), start, y);
+    bottom = Math.max(bottom, stem.bottom);
+    top = Math.min(top, stem.top);
+    const group = layoutGroup(ctx, items, stem.lineEnd, y, {
+      rightTines: false,
+      conj: ctx.index.conjunction(ownerId, role),
+    });
+    bottom = Math.max(bottom, group.bottom);
+    top = Math.min(top, group.top);
+    cur = group.right;
+  }
+  return { right: cur, bottom, top, lineEnd: cur };
+}
+
+function layoutOne(
+  ctx: Ctx,
+  member: DraftNode,
+  x: number,
+  y: number,
+  opts: { drawLine: boolean; lead?: number; minW?: number; withComplements?: boolean },
+): Placed {
+  const head = layoutHead(ctx, member, x, y, { drawLine: opts.drawLine, lead: opts.lead, minW: opts.minW });
+  if (!opts.withComplements) return head;
+  const rest = layoutComplementRun(ctx, member.id, head.lineEnd, y);
+  return {
+    right: Math.max(head.right, rest.right),
+    bottom: Math.max(head.bottom, rest.bottom),
+    top: Math.min(head.top, rest.top),
+    lineEnd: Math.max(head.lineEnd, rest.lineEnd),
+  };
+}
+
+/**
+ * One baseline position: a single word, or a fork for a compound part.
+ * A closed fork (`rightTines`) meets again on the right. An open fork stays split.
+ * The conjunction sits on the horizontal tines beside the hinge: before the words when
+ * the lines meet on the left, and after the words when they meet on the right.
+ */
 function layoutGroup(
   ctx: Ctx,
   members: DraftNode[],
   x: number,
   y: number,
-  opts: { rightTines: boolean; conj?: DraftNode },
+  opts: { rightTines: boolean; conj?: DraftNode; withComplements?: boolean },
 ): Ext {
   if (members.length === 0) return { right: x + 12, bottom: y, top: y - WORD_H };
 
   const leadFor = (m: DraftNode) => (ctx.connectorVerbs.has(m.id) ? 44 : 12);
 
   if (members.length === 1) {
-    const r = layoutHead(ctx, members[0], x, y, { drawLine: false, lead: leadFor(members[0]) });
-    const right = r.right + 10;
+    const r = layoutOne(ctx, members[0], x, y, { drawLine: false, lead: leadFor(members[0]), withComplements: opts.withComplements });
+    const right = opts.withComplements ? Math.max(r.lineEnd, r.right) : r.right + 10;
     seg(ctx, x, y, right, y);
     return { right, bottom: r.bottom, top: r.top };
   }
 
-  const sizes = members.map((m) => {
-    const r = layoutHead(scratch(ctx), m, 0, 0, { drawLine: true, lead: leadFor(m) });
-    return { w: r.right + 10, depth: r.bottom };
+  const measured = members.map((m) => {
+    const r = layoutOne(scratch(ctx), m, 0, 0, { drawLine: true, lead: leadFor(m), withComplements: opts.withComplements });
+    return { w: r.lineEnd, depth: r.bottom };
   });
-  const bw = Math.max(...sizes.map((s) => s.w));
-  const forkIn = opts.conj ? 118 : 40;
-  const forkOut = opts.rightTines ? 40 : 0;
-
   const ys = [0];
-  for (let i = 1; i < members.length; i++) ys.push(ys[i - 1] + sizes[i - 1].depth + WORD_H + 40);
+  for (let i = 1; i < members.length; i++) ys.push(ys[i - 1] + measured[i - 1].depth + WORD_H + 40);
+  const span = ys[ys.length - 1] - ys[0];
+  const bw = opts.rightTines ? Math.max(...measured.map((s) => s.w)) : 0;
+  const conjW = opts.conj ? Math.min(ctx.widthOf(opts.conj), 72) : 0;
+  // Keep the split from turning into a hairline when a tine has a tall phrase hanging under it.
+  const forkIn = Math.max(56, Math.round(span * 0.42));
+  const leftGap = opts.conj && !opts.rightTines ? conjW + 22 : 0;
+  const rightGap = opts.conj && opts.rightTines ? conjW + 22 : 0;
+  const forkOut = opts.rightTines ? Math.max(40, Math.round(span * 0.16)) : 0;
+  const wordX = x + forkIn + leftGap;
   const shift = y - (ys[0] + ys[ys.length - 1]) / 2;
   const rows = ys.map((v) => v + shift);
 
   let bottom = y;
+  let right = x;
   members.forEach((m, i) => {
     const by = rows[i];
     seg(ctx, x, y, x + forkIn, by);
-    const r = layoutHead(ctx, m, x + forkIn, by, { drawLine: true, minW: bw, lead: leadFor(m) });
-    if (opts.rightTines) seg(ctx, x + forkIn + bw, by, x + forkIn + bw + forkOut, y);
+    if (leftGap) seg(ctx, x + forkIn, by, wordX, by);
+    const r = layoutOne(ctx, m, wordX, by, {
+      drawLine: true,
+      lead: leadFor(m),
+      minW: opts.rightTines ? bw : undefined,
+      withComplements: opts.withComplements,
+    });
+    if (opts.rightTines) {
+      const joinAt = wordX + bw + rightGap;
+      const tipX = joinAt + forkOut;
+      if (r.lineEnd < joinAt) seg(ctx, r.lineEnd, by, joinAt, by);
+      seg(ctx, joinAt, by, tipX, y);
+      right = tipX;
+    } else {
+      right = Math.max(right, r.right, r.lineEnd);
+    }
     bottom = Math.max(bottom, r.bottom);
   });
 
   if (opts.conj) {
-    const cx = x + forkIn - 8;
-    const t = (forkIn - 8) / forkIn;
-    seg(ctx, cx, y + (rows[0] - y) * t, cx, y + (rows[rows.length - 1] - y) * t, true);
-    const w = Math.min(ctx.widthOf(opts.conj), 60);
-    slot(ctx, opts.conj.id, cx - 6 - w, y + WORD_H / 2, w, 0);
+    const gapStart = opts.rightTines ? wordX + bw : x + forkIn;
+    const cx = gapStart + conjW + 12;
+    const mid = (rows[0] + rows[1]) / 2 + WORD_H / 2;
+    seg(ctx, cx, rows[0], cx, rows[rows.length - 1], true);
+    slot(ctx, opts.conj.id, gapStart + 8, mid, conjW, 0);
   }
 
-  return { right: x + forkIn + bw + forkOut, bottom, top: rows[0] - WORD_H };
+  return { right, bottom, top: rows[0] - WORD_H };
 }
 
 function layoutClause(ctx: Ctx, clause: DraftNode, x: number, y: number): Ext {
@@ -210,32 +331,52 @@ function layoutClause(ctx: Ctx, clause: DraftNode, x: number, y: number): Ext {
     bottom = Math.max(bottom, e.bottom);
   };
 
-  if (subjects.length > 1) seg(ctx, x - 24, y, x, y);
-  const s = layoutGroup(ctx, subjects, x, y, { rightTines: true, conj: conj("subject") });
+  const s = layoutGroup(ctx, subjects, x, y, { rightTines: subjects.length > 1, conj: conj("subject") });
   track(s);
   let cur = s.right;
+  const subjectStem = layoutStemMods(ctx, sharedMods(ctx, clause.id, "subject"), cur, y);
+  track(subjectStem);
+  cur = subjectStem.lineEnd;
+
   seg(ctx, cur, y - 34, cur, y + 24);
 
-  const v = layoutGroup(ctx, verbs, cur, y, { rightTines: true, conj: conj("verb") });
+  const clauseIos = inSentenceOrder(index.children(clause.id, "indirect-object"));
+  const sharedFollows =
+    verbs.length > 1 && (clauseIos.length > 0 || COMPLEMENT_ROLES.some((role) => index.children(clause.id, role).length > 0));
+  const perVerb = verbs.some((verb) => COMPLEMENT_ROLES.some((role) => index.children(verb.id, role).length > 0));
+
+  if (!sharedFollows) {
+    const verbStem = layoutStemMods(ctx, sharedMods(ctx, clause.id, "verb"), cur, y);
+    track(verbStem);
+    cur = verbStem.lineEnd;
+  }
+
+  const v = layoutGroup(ctx, verbs, cur, y, {
+    rightTines: sharedFollows,
+    conj: conj("verb"),
+    withComplements: !sharedFollows && (perVerb || verbs.length > 1),
+  });
   track(v);
   cur = v.right;
 
-  for (const role of COMPLEMENT_ROLES) {
-    const items = parts(role);
-    if (items.length === 0) continue;
-    let start = cur;
-    if (role === "direct-object") {
-      seg(ctx, cur, y - 34, cur, y);
-    } else {
-      seg(ctx, cur, y - 34, cur + 16, y);
-      seg(ctx, cur, y, cur + 16, y);
-      start = cur + 16;
+  if (sharedFollows) {
+    const verbStem = layoutStemMods(ctx, sharedMods(ctx, clause.id, "verb"), cur, y);
+    track(verbStem);
+    cur = verbStem.lineEnd;
+    if (clauseIos.length) {
+      const hung = layoutStemIndirects(ctx, clauseIos, cur, y);
+      track(hung);
+      cur = hung.lineEnd;
     }
-    const c = layoutGroup(ctx, items, start, y, { rightTines: false, conj: conj(role) });
-    track(c);
-    cur = c.right;
   }
-  return { right: cur, bottom, top };
+
+  if (sharedFollows) {
+    seg(ctx, cur, y, cur + 36, y);
+    cur += 36;
+  }
+  const comps = layoutComplementRun(ctx, clause.id, cur, y);
+  track(comps);
+  return { right: comps.right, bottom, top };
 }
 
 /** How far right of a clause's start its connector should land: just past the first verb's word. */
@@ -254,9 +395,17 @@ export function layoutDiagram(nodes: DraftNode[], widthOf: (node: DraftNode) => 
 
   const ioFor = new Map<string, DraftNode[]>();
   for (const clause of nodes.filter((n) => n.role === "clause")) {
-    const [firstVerb] = inSentenceOrder(index.children(clause.id, "verb"));
-    const ios = inSentenceOrder(index.children(clause.id, "indirect-object"));
-    if (firstVerb && ios.length) ioFor.set(firstVerb.id, ios);
+    const verbs = inSentenceOrder(index.children(clause.id, "verb"));
+    const clauseIos = inSentenceOrder(index.children(clause.id, "indirect-object"));
+    const shared =
+      verbs.length > 1 &&
+      (clauseIos.length > 0 || COMPLEMENT_ROLES.some((role) => index.children(clause.id, role).length > 0));
+    // A shared indirect object hangs from the stem after the verb lines meet. One verb keeps it underneath.
+    if (!shared && verbs[0] && clauseIos.length) ioFor.set(verbs[0].id, clauseIos);
+    for (const verb of verbs) {
+      const own = inSentenceOrder(index.children(verb.id, "indirect-object"));
+      if (own.length) ioFor.set(verb.id, [...(ioFor.get(verb.id) ?? []), ...own]);
+    }
   }
 
   const sub = index.subordinateClause();

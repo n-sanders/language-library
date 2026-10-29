@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getDb, schema } from "@/db";
 import { getChapter, isDiagramChapter } from "@/content/books";
 import { sanitizeTopic } from "@/content/topics";
+import { AnswerKeyError } from "@/lib/ai/answerKey";
 import { generateSentence } from "@/lib/ai/generate";
 import { generateDiagram } from "@/lib/ai/generateDiagram";
 import { AiNotConfiguredError } from "@/lib/ai/openrouter";
@@ -11,6 +12,8 @@ import { GenerationFailedError } from "@/lib/ai/retry";
 import { handle, jsonError } from "@/lib/api";
 import { requireApiUser } from "@/lib/auth";
 import { structureOf } from "@/lib/diagram/skeleton";
+import { stockDiagram } from "@/lib/diagram/stock";
+import { stockSentencesEnabled } from "@/lib/settings";
 
 const bodySchema = z.object({
   book: z.string(),
@@ -46,9 +49,12 @@ export const POST = handle(async (req: Request) => {
   const { chapter } = found;
   try {
     const opts = { topic, gradeLevel: user.gradeLevel, avoid };
-    const generated = isDiagramChapter(chapter)
-      ? await generateDiagram({ chapter, ...opts })
-      : { ...(await generateSentence({ chapter, ...opts })), nodes: null };
+    const generated =
+      isDiagramChapter(chapter) && stockSentencesEnabled()
+        ? stockDiagram(chapter, avoid)
+        : isDiagramChapter(chapter)
+          ? await generateDiagram({ chapter, ...opts })
+          : { ...(await generateSentence({ chapter, ...opts })), nodes: null };
     const { nodes } = generated;
 
     const row = db
@@ -75,6 +81,7 @@ export const POST = handle(async (req: Request) => {
     });
   } catch (err) {
     if (err instanceof AiNotConfiguredError) return jsonError(503, err.message);
+    if (err instanceof AnswerKeyError) return jsonError(422, err.message);
     if (err instanceof GenerationFailedError) return jsonError(422, err.message, "generation_failed");
     throw err;
   }

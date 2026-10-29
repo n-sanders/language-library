@@ -6,7 +6,7 @@ function n(
   role: DiagramRole,
   parent: string | null,
   words: number[] = [],
-  extra: { clauseKind?: ClauseKind; joins?: JoinableRole; implied?: "you" } = {},
+  extra: { clauseKind?: ClauseKind; joins?: JoinableRole; implied?: "you"; modifies?: JoinableRole } = {},
 ): DiagramNode {
   return { id, role, parent, words, ...extra };
 }
@@ -20,6 +20,7 @@ const F3: DiagramFeature[] = [...F2, "predicate-adjective", "predicate-nominativ
 const F4: DiagramFeature[] = [...F3, "prepositional-phrase"];
 const F5: DiagramFeature[] = [...F4, "indirect-object"];
 const F6: DiagramFeature[] = [...F5, "compound"];
+const F6b: DiagramFeature[] = [...F6, "compound-predicate"];
 const F7: DiagramFeature[] = [...F6, "coordinate-clause"];
 const F8: DiagramFeature[] = [...F7, "subordinate-clause"];
 const F9: DiagramFeature[] = [...F8, "implied-you", "question", "verb-phrase"];
@@ -176,6 +177,63 @@ const chapters: DiagramChapter[] = [
       "Use exactly one compound part: two subjects, two verbs, or two direct objects joined by and, or, or but.",
       "If the verbs are compound, do not use any direct object, indirect object, or predicate word.",
       "Keep it to one clause.",
+    ],
+  },
+  {
+    kind: "diagram",
+    slug: "compound-predicates",
+    title: "Compound Subjects & Predicates",
+    summary: "A sentence can split in more than one place: two subjects and two verbs, verbs that share an object, or verbs that each take their own object.",
+    features: F6b,
+    required: [["compound-predicate"]],
+    examples: [
+      // Jake and Emma laughed and clapped .
+      example("Jake and Emma laughed and clapped.", [
+        main(),
+        n("s1", "subject", "c", [0]),
+        n("s2", "subject", "c", [2]),
+        n("ks", "conjunction", "c", [1], { joins: "subject" }),
+        n("v1", "verb", "c", [3]),
+        n("v2", "verb", "c", [5]),
+        n("kv", "conjunction", "c", [4], { joins: "verb" }),
+      ]),
+      // They washed and dried the sticky pots and greasy pans .
+      example("They washed and dried the sticky pots and greasy pans.", [
+        main(),
+        n("s", "subject", "c", [0]),
+        n("v1", "verb", "c", [1]),
+        n("v2", "verb", "c", [3]),
+        n("kv", "conjunction", "c", [2], { joins: "verb" }),
+        n("o1", "direct-object", "c", [6]),
+        n("o2", "direct-object", "c", [9]),
+        n("ko", "conjunction", "c", [7], { joins: "direct-object" }),
+        n("mthe", "modifier", "c", [4], { modifies: "direct-object" }),
+        n("msticky", "modifier", "o1", [5]),
+        n("mgreasy", "modifier", "o2", [8]),
+      ]),
+      // They mixed the dough quickly , put it into the oven , and waited .
+      example("They mixed the dough quickly, put it into the oven, and waited.", [
+        main(),
+        n("s", "subject", "c", [0]),
+        n("v1", "verb", "c", [1]),
+        n("v2", "verb", "c", [6]),
+        n("v3", "verb", "c", [13]),
+        n("kv", "conjunction", "c", [12], { joins: "verb" }),
+        n("o1", "direct-object", "v1", [3]),
+        n("mthe", "modifier", "o1", [2]),
+        n("mq", "modifier", "v1", [4]),
+        n("o2", "direct-object", "v2", [7]),
+        n("p", "preposition", "v2", [8]),
+        n("po", "prep-object", "p", [10]),
+        n("mthe2", "modifier", "po", [9]),
+      ]),
+    ],
+    generationRules: [
+      "Use exactly one of these patterns: a compound subject and a compound verb with nothing after the verbs; a compound verb whose verbs share one compound direct object, including a modifier of that whole object; or two or three verbs where each verb that needs one has its own object, adverb, or prepositional phrase parented to that verb.",
+      "One clause only. At most three verbs. Join each compound with a single and. Commas are punctuation and are not placed on the diagram.",
+      "When the verbs share an object, the object and its conjunction parent to the clause. When each verb has its own object, that object parents to the verb.",
+      "A word that modifies every part of a compound, such as 'the' in 'the sticky pots and greasy pans', is a modifier parented to the clause with modifies set to direct-object.",
+      "Do not use a predicate adjective, predicate nominative, indirect object, dependent clause, or a second independent clause.",
     ],
   },
   {

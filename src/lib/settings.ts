@@ -7,6 +7,7 @@ export const SETTING_KEYS = {
   sentenceModel: "model.sentence",
   helperModel: "model.helper",
   auditModel: "model.audit",
+  stockSentences: "diagram.stock_sentences",
 } as const;
 
 export const DEFAULT_MODELS = {
@@ -69,4 +70,18 @@ export function setModels(models: { sentence: string; helper: string; audit: str
   write(SETTING_KEYS.sentenceModel, models.sentence);
   write(SETTING_KEYS.helperModel, models.helper);
   write(SETTING_KEYS.auditModel, models.audit);
+}
+
+/** The admin checkbox, ignoring the environment override. */
+export function stockSentencesSetting(): boolean {
+  return read(SETTING_KEYS.stockSentences)?.value === "1";
+}
+
+/** Diagram practice serves hand-built examples instead of calling the model. */
+export function stockSentencesEnabled(): boolean {
+  return process.env.STOCK_SENTENCES === "1" || stockSentencesSetting();
+}
+
+export function setStockSentences(enabled: boolean) {
+  write(SETTING_KEYS.stockSentences, enabled ? "1" : "0");
 }

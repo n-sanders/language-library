@@ -13,7 +13,12 @@ function anchor(node: DiagramNode): string {
 /** A node's place in the diagram, independent of node ids and sibling order, e.g. "modifier@2" or "subject@main". */
 export function relationOf(index: DiagramIndex, node: DiagramNode): string {
   const parent = index.get(node.parent);
-  const role = node.role === "conjunction" ? `conjunction:${node.joins ?? "?"}` : node.role;
+  const role =
+    node.role === "conjunction"
+      ? `conjunction:${node.joins ?? "?"}`
+      : node.modifies
+        ? `${node.role}:${node.modifies}`
+        : node.role;
   return `${role}@${parent ? anchor(parent) : "root"}`;
 }
 

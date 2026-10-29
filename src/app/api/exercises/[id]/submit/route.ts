@@ -25,6 +25,7 @@ const draftNodeSchema = z.object({
   parent: z.string().max(40).nullable(),
   clauseKind: z.enum(CLAUSE_KINDS).optional(),
   joins: z.enum(JOINABLE_ROLES).optional(),
+  modifies: z.enum(JOINABLE_ROLES).optional(),
   implied: z.literal("you").optional(),
   fixed: z.boolean().optional(),
 });

@@ -10,7 +10,7 @@ import { formatAuditTranscript, loadAuditEvents, parseAuditKind, parseAuditStude
 import { destroyAllSessionsForUser, requireAdmin } from "@/lib/auth";
 import { isGradeLevel } from "@/lib/grade";
 import { hashPassword, MIN_PASSWORD_LENGTH } from "@/lib/password";
-import { clearApiKey as clearStoredKey, getModels, setApiKey, setModels } from "@/lib/settings";
+import { clearApiKey as clearStoredKey, getModels, setApiKey, setModels, setStockSentences } from "@/lib/settings";
 
 const USERNAME_RE = /^[a-z0-9._-]{2,32}$/;
 
@@ -133,6 +133,16 @@ export async function saveModels(_prev: ActionResult, fd: FormData): Promise<Act
   setModels({ sentence, helper, audit });
   revalidatePath("/admin/settings");
   return { ok: true, message: "Models saved." };
+}
+
+export async function saveStockSentences(_prev: ActionResult, fd: FormData): Promise<ActionResult> {
+  await requireAdmin();
+  const enabled = fd.get("stockSentences") === "on";
+  setStockSentences(enabled);
+  revalidatePath("/admin/settings");
+  revalidatePath("/practice", "layout");
+  const on = enabled || process.env.STOCK_SENTENCES === "1";
+  return { ok: true, message: on ? "Sample sentences are on." : "Sample sentences are off." };
 }
 
 export async function runConnectionTest(): Promise<ActionResult> {

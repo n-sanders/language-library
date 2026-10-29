@@ -2,7 +2,7 @@ import type { DiagramChapter } from "@/content/books";
 import { AnswerKeyError } from "@/lib/ai/answerKey";
 import type { Token } from "@/lib/types";
 import { COMPLEMENT_ROLES, DiagramIndex, HEAD_ROLES } from "./tree";
-import { type DiagramFeature, type DiagramNode, type DiagramRole, type DraftNode, JOINABLE_ROLES, ROLE_NAMES } from "./types";
+import { type DiagramFeature, type DiagramNode, type DraftNode, JOINABLE_ROLES, ROLE_NAMES } from "./types";
 
 const FEATURE_NAMES: Record<DiagramFeature, string> = {
   modifier: "modifiers",
@@ -12,6 +12,7 @@ const FEATURE_NAMES: Record<DiagramFeature, string> = {
   "prepositional-phrase": "a prepositional phrase",
   "indirect-object": "an indirect object",
   compound: "a compound subject, verb, or object",
+  "compound-predicate": "a compound predicate (more than one compound part, or verbs that take objects)",
   "coordinate-clause": "a second independent clause (compound sentence)",
   "subordinate-clause": "a dependent clause",
   "implied-you": "an understood (you) subject",
@@ -19,7 +20,6 @@ const FEATURE_NAMES: Record<DiagramFeature, string> = {
   "verb-phrase": "a helping verb (verb phrase)",
 };
 
-const CLAUSE_PART_ROLES: DiagramRole[] = ["subject", "verb", "indirect-object", ...COMPLEMENT_ROLES];
 const COMPOUNDABLE = JOINABLE_ROLES.filter((r) => r !== "clause");
 
 /** Diagram features a sentence uses, so a chapter can require some and forbid the rest. */
@@ -37,7 +37,15 @@ export function featuresUsed(tokens: Token[], nodes: DiagramNode[]): Set<Diagram
     if (node.role === "clause" && node.clauseKind === "subordinate") used.add("subordinate-clause");
     if (node.implied) used.add("implied-you");
     if (node.role === "verb" && node.words.length > 1) used.add("verb-phrase");
-    if (node.role === "clause" && COMPOUNDABLE.some((r) => index.children(node.id, r).length > 1)) used.add("compound");
+    if (node.role === "clause") {
+      const verbs = index.children(node.id, "verb");
+      const compounded = COMPOUNDABLE.filter((r) => index.children(node.id, r).length > 1);
+      const verbCompounds = verbs.some((verb) => COMPLEMENT_ROLES.some((r) => index.children(verb.id, r).length > 1));
+      if (compounded.length > 0 || verbCompounds) used.add("compound");
+      const sharedFollows = index.children(node.id, "indirect-object", ...COMPLEMENT_ROLES).length > 0;
+      const perVerb = verbs.some((verb) => index.children(verb.id, "indirect-object", ...COMPLEMENT_ROLES).length > 0);
+      if (compounded.length > 1 || (verbs.length > 1 && (sharedFollows || perVerb))) used.add("compound-predicate");
+    }
   }
   if (tokens[tokens.length - 1]?.text === "?") used.add("question");
   return used;
@@ -102,16 +110,27 @@ export function validateDiagram(chapter: DiagramChapter, tokens: Token[], nodes:
       fail(`The ${ROLE_NAMES[node.role]} "${node.id}" must hold exactly one word. Give each word its own node.`);
     }
 
-    if (CLAUSE_PART_ROLES.includes(node.role)) needParent(parent?.role === "clause", "a clause");
-    if (node.role === "modifier") needParent(!!parent && (HEAD_ROLES.includes(parent.role) || parent.role === "modifier"), "a word it describes");
+    if (node.role === "subject" || node.role === "verb") needParent(parent?.role === "clause", "a clause");
+    if (node.role === "indirect-object" || (COMPLEMENT_ROLES as readonly string[]).includes(node.role)) {
+      const onVerb = parent?.role === "verb" && index.clauseOf(parent);
+      needParent(parent?.role === "clause" || Boolean(onVerb), "a clause, or the one verb they belong to");
+    }
+    if (node.role === "modifier" && node.modifies) {
+      const ownsCompound =
+        (parent?.role === "clause" || parent?.role === "verb") && index.children(parent.id, node.modifies).length >= 2;
+      if (!ownsCompound) fail(`Modifier "${node.id}" must describe a compound that has at least two ${ROLE_NAMES[node.modifies]}s.`);
+    } else if (node.role === "modifier") {
+      needParent(!!parent && (HEAD_ROLES.includes(parent.role) || parent.role === "modifier"), "a word it describes");
+    }
     if (node.role === "preposition") needParent(!!parent && HEAD_ROLES.includes(parent.role), "the word the phrase describes");
     if (node.role === "prep-object") needParent(parent?.role === "preposition", "a preposition");
     if (node.role === "subordinator") needParent(parent?.clauseKind === "subordinate", "the dependent clause");
     if (node.role === "conjunction") {
-      if (!node.joins) fail(`Conjunction "${node.id}" needs "joins".`);
-      if (node.joins === "clause") needParent(parent?.clauseKind === "coordinate", "the second clause");
-      else if (parent?.role !== "clause" || index.children(parent.id, node.joins!).length < 2) {
-        fail(`Conjunction "${node.id}" joins ${node.joins} parts, but its clause doesn't have two of them.`);
+      const joins = node.joins;
+      if (!joins) fail(`Conjunction "${node.id}" needs "joins".`);
+      else if (joins === "clause") needParent(parent?.clauseKind === "coordinate", "the second clause");
+      else if ((parent?.role !== "clause" && parent?.role !== "verb") || index.children(parent.id, joins).length < 2) {
+        fail(`Conjunction "${node.id}" joins ${joins} parts, but its parent doesn't have two of them.`);
       }
     }
   }
@@ -125,18 +144,28 @@ export function validateDiagram(chapter: DiagramChapter, tokens: Token[], nodes:
   }
 
   for (const clause of clauses) {
-    for (const role of COMPOUNDABLE) {
-      const count = index.children(clause.id, role).length;
-      const conj = index.children(clause.id, "conjunction").filter((c) => c.joins === role).length;
-      if (count > 1 && conj !== 1) fail(`The compound ${ROLE_NAMES[role]}s need exactly one conjunction node joining them.`);
+    const hosts = [clause, ...index.children(clause.id, "verb")];
+    for (const host of hosts) {
+      for (const role of COMPOUNDABLE) {
+        const count = index.children(host.id, role).length;
+        const conj = index.children(host.id, "conjunction").filter((c) => c.joins === role).length;
+        if (count > 1 && conj !== 1) fail(`The compound ${ROLE_NAMES[role]}s need exactly one conjunction node joining them.`);
+      }
     }
-    const verbs = index.children(clause.id, "verb").length;
-    const complements = index.children(clause.id, "indirect-object", ...COMPLEMENT_ROLES);
-    if (verbs > 1 && complements.length) fail("Compound verbs can't have objects or predicate words in this app.");
-    const kinds = new Set(complements.filter((c) => c.role !== "indirect-object").map((c) => c.role));
-    if (kinds.size > 1) fail("A clause can have direct objects or a predicate word, not a mix.");
-    if (index.children(clause.id, "indirect-object").length && !index.children(clause.id, "direct-object").length) {
-      fail("An indirect object needs a direct object in the same clause.");
+    const verbs = index.children(clause.id, "verb");
+    const shared = index.children(clause.id, "indirect-object", ...COMPLEMENT_ROLES);
+    const perVerb = verbs.flatMap((verb) => index.children(verb.id, "indirect-object", ...COMPLEMENT_ROLES));
+    if (verbs.length === 1 && perVerb.length) {
+      fail("With one verb, objects and predicate words belong on the clause, not on the verb.");
+    }
+    if (shared.length && perVerb.length) fail("Don't mix a shared object with objects that belong to each verb.");
+    for (const host of [clause, ...verbs]) {
+      const complements = index.children(host.id, "indirect-object", ...COMPLEMENT_ROLES);
+      const kinds = new Set(complements.filter((c) => c.role !== "indirect-object").map((c) => c.role));
+      if (kinds.size > 1) fail("A line can have direct objects or a predicate word, not a mix.");
+      if (index.children(host.id, "indirect-object").length && !index.children(host.id, "direct-object").length) {
+        fail("An indirect object needs a direct object on the same line.");
+      }
     }
     if (clause.clauseKind === "subordinate" && index.children(clause.id, "subordinator").length !== 1) {
       fail("The dependent clause needs exactly one subordinating conjunction.");

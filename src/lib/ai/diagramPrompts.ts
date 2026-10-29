@@ -20,7 +20,7 @@ export function diagramSchema() {
           items: {
             type: "object",
             additionalProperties: false,
-            required: ["id", "role", "words", "parent", "clauseKind", "joins", "implied"],
+            required: ["id", "role", "words", "parent", "clauseKind", "joins", "modifies", "implied"],
             properties: {
               id: { type: "string" },
               role: { type: "string", enum: [...DIAGRAM_ROLES] },
@@ -28,6 +28,7 @@ export function diagramSchema() {
               parent: { type: ["string", "null"] },
               clauseKind: { type: "string", enum: [...CLAUSE_KINDS, "none"] },
               joins: { type: "string", enum: [...JOINABLE_ROLES, "none"] },
+              modifies: { type: "string", enum: [...JOINABLE_ROLES, "none"] },
               implied: { type: "boolean" },
             },
           },
@@ -38,10 +39,21 @@ export function diagramSchema() {
 }
 
 /** The model's wire format: every field present, with "none"/false standing in for "not set". */
-type WireNode = Omit<DiagramNode, "clauseKind" | "joins" | "implied"> & { clauseKind: string; joins: string; implied: boolean };
+type WireNode = Omit<DiagramNode, "clauseKind" | "joins" | "modifies" | "implied"> & {
+  clauseKind: string;
+  joins: string;
+  modifies: string;
+  implied: boolean;
+};
 
 export function toWire(node: DiagramNode): WireNode {
-  return { ...node, clauseKind: node.clauseKind ?? "none", joins: node.joins ?? "none", implied: Boolean(node.implied) };
+  return {
+    ...node,
+    clauseKind: node.clauseKind ?? "none",
+    joins: node.joins ?? "none",
+    modifies: node.modifies ?? "none",
+    implied: Boolean(node.implied),
+  };
 }
 
 function exampleJson(sentence: string, nodes: DiagramNode[]): string {
@@ -51,14 +63,15 @@ function exampleJson(sentence: string, nodes: DiagramNode[]): string {
 
 const ROLE_RULES = [
   `- "clause": a baseline. Exactly one has clauseKind "main" and parent null. A second independent clause has clauseKind "coordinate" and parent null. A dependent (adverb) clause has clauseKind "subordinate" and its parent is the id of the main-clause VERB node it tells about. Clauses have words [].`,
-  `- "subject", "verb", "direct-object", "indirect-object", "predicate-adjective", "predicate-nominative": parent is their clause id.`,
-  `- "modifier" (${ROLE_NAMES.modifier}): an article (a, an, the), adjective, or adverb. Parent is the word node it describes, including another modifier (for example "very" describing "big").`,
+  `- "subject" and "verb": parent is their clause id.`,
+  `- "direct-object", "indirect-object", "predicate-adjective", "predicate-nominative": parent is the clause when there is one verb, or when every verb shares them. When each verb in a compound predicate has its own, parent is that verb's id. Never mix shared and per-verb objects in one clause.`,
+  `- "modifier" (${ROLE_NAMES.modifier}): an article (a, an, the), adjective, or adverb. Parent is the word node it describes, including another modifier (for example "very" describing "big"). A word that describes every part of a compound instead parents to the clause or verb that owns those parts, and modifies is that role ("direct-object", "subject", ...).`,
   `- "preposition": parent is the word node the phrase describes. "prep-object": parent is its preposition. Modifiers of the object hang from the prep-object node.`,
-  `- "conjunction": for a compound part, parent is the clause and joins is the role being joined ("subject", "verb", "direct-object"...). For a compound sentence, parent is the coordinate clause and joins is "clause".`,
+  `- "conjunction": parent is the same node as the parts it joins, and joins is that role ("subject", "verb", "direct-object"...). For a compound sentence, parent is the coordinate clause and joins is "clause".`,
   `- "subordinator": the subordinating conjunction (because, when...). Parent is the subordinate clause.`,
   `- A command's understood subject is a "subject" node with implied true and words [].`,
   `- Only a verb node may hold more than one word (a helping verb plus main verb, like "is singing" or "Did ... sing"). Every other node holds exactly one word.`,
-  `- Set clauseKind "none" on non-clause nodes, joins "none" on non-conjunction nodes, and implied false unless it is the understood "you".`,
+  `- Set clauseKind "none" on non-clause nodes, joins "none" on non-conjunction nodes, modifies "none" unless the modifier describes a whole compound, and implied false unless it is the understood "you".`,
 ];
 
 export function diagramMessages(opts: {
@@ -138,7 +151,7 @@ export function diagramHelperPrompt(opts: {
     ...(seesWork ? ["The student's diagram right now:", ...work.map((l) => `- ${l}`), ""] : []),
     "How to help:",
     "- Teach the steps: find the verb first ('What is happening?'), then the subject ('Who or what is doing it?'), then objects ('Whom or what did they ___?'), then the describing words and phrases.",
-    "- Explain where each kind of word goes: subject and verb on the baseline split by a line that crosses it; a direct object after a short line that stops at the baseline; a predicate word after a line that slants back toward the subject; modifiers on slanted lines under the word they describe; a preposition on a slant with its object on a line below; an indirect object below the verb.",
+    "- Explain where each kind of word goes: subject and verb on the baseline split by a line that crosses it; a direct object after a short line that stops at the baseline; a predicate word after a line that slants back toward the subject; modifiers on slanted lines under the word they describe; a preposition on a slant with its object on a line below; an indirect object below the verb. When verbs share an object, their lines meet before it. When each verb has its own object, that object stays on that verb's line. A word that describes a whole compound sits on the stem before the split.",
     "- Ask one guiding question at a time and let the student think.",
     ...(seesWork
       ? [

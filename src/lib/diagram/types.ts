@@ -32,10 +32,11 @@ export type JoinableRole = (typeof JOINABLE_ROLES)[number];
 /**
  * One piece of a Reed-Kellogg diagram, stored as a flat list with parent links.
  * - clause: parent is null (main or coordinate) or the main-clause verb node a subordinate clause attaches to.
- * - subject, verb, objects, predicate words: parent is their clause.
- * - modifier, preposition: parent is the word node they describe.
+ * - subject, verb: parent is their clause.
+ * - direct object, indirect object, predicate words: parent is the clause when one verb has them or every verb shares them, or one verb when only that verb has them.
+ * - modifier, preposition: parent is the word they describe. A modifier of a whole compound parents to the clause or verb that owns those parts, and `modifies` names the role.
  * - prep-object: parent is its preposition.
- * - conjunction: parent is the clause; `joins` says which compound part (or "clause" for a compound sentence).
+ * - conjunction: parent is the same node as the parts it joins (the clause, or one verb). `joins` says which role, or "clause" for a compound sentence.
  * - subordinator: parent is the subordinate clause.
  */
 export type DiagramNode = {
@@ -47,6 +48,8 @@ export type DiagramNode = {
   parent: string | null;
   clauseKind?: ClauseKind;
   joins?: JoinableRole;
+  /** Set on a modifier that describes every part of a compound, rather than one word. */
+  modifies?: JoinableRole;
 };
 
 /** The student's in-progress diagram. Fixed nodes come from the mode's starting skeleton and can't be removed. */
@@ -63,6 +66,7 @@ export const DIAGRAM_FEATURES = [
   "prepositional-phrase",
   "indirect-object",
   "compound",
+  "compound-predicate",
   "coordinate-clause",
   "subordinate-clause",
   "implied-you",

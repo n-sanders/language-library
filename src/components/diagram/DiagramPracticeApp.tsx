@@ -25,16 +25,21 @@ import { WordBank } from "./WordBank";
 
 type Exercise = { id: number; topic: string; tokens: Token[]; structure: DiagramNode[] };
 
+const SAMPLE_TOPIC = "Sample";
+
 export function DiagramPracticeApp({
   bookSlug,
   bookTitle,
   chapter,
   studentName,
+  stockMode = false,
 }: {
   bookSlug: string;
   bookTitle: string;
   chapter: DiagramChapter;
   studentName: string;
+  /** Serve this chapter's hand-built examples instead of asking for a topic. */
+  stockMode?: boolean;
 }) {
   useActivityTracker(bookSlug, chapter.slug);
   const [mode, setMode] = useDiagramMode(bookSlug, chapter.slug);
@@ -198,17 +203,33 @@ export function DiagramPracticeApp({
         <ModePicker mode={mode} onChange={changeMode} disabled={attempted && !done} />
         <ExampleCard examples={chapter.examples} />
 
-        {!topic && <TopicPicker onPick={loadSentence} />}
+        {!topic &&
+          (stockMode ? (
+            <div className="flex flex-col items-start gap-3 rounded-2xl border border-amber-200 bg-white/70 p-5">
+              <p className="text-amber-900">Practice a sample sentence from this chapter. No new sentence is written.</p>
+              <button type="button" className="btn-primary" onClick={() => loadSentence(SAMPLE_TOPIC)}>
+                Practice a sample sentence
+              </button>
+            </div>
+          ) : (
+            <TopicPicker onPick={loadSentence} />
+          ))}
 
         {topic && (
           <div className="flex flex-col gap-5 rounded-2xl border border-amber-200 bg-white/70 p-5 shadow-sm sm:p-8">
             <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-amber-800">
-              <span>
-                Topic: <strong>{topic}</strong>
-              </span>
-              <button type="button" className="underline underline-offset-4" onClick={() => setTopic(null)}>
-                Change topic
-              </button>
+              {stockMode ? (
+                <span>Sample sentence for this chapter.</span>
+              ) : (
+                <span>
+                  Topic: <strong>{topic}</strong>
+                </span>
+              )}
+              {!stockMode && (
+                <button type="button" className="underline underline-offset-4" onClick={() => setTopic(null)}>
+                  Change topic
+                </button>
+              )}
             </div>
 
             {loading && <WritingLoader topic={topic} />}
@@ -282,12 +303,12 @@ export function DiagramPracticeApp({
                         Show answer
                       </button>
                       <button type="button" className="btn-secondary" onClick={() => loadSentence(topic)}>
-                        Skip this one
+                        {stockMode ? "Another sentence" : "Skip this one"}
                       </button>
                     </>
                   ) : (
                     <button type="button" className="btn-primary text-lg" onClick={() => loadSentence(topic)}>
-                      Next sentence →
+                      {stockMode ? "Another sentence" : "Next sentence →"}
                     </button>
                   )}
                   <ReportProblem exerciseId={exercise.id} />

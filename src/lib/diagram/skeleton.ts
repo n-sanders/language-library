@@ -23,7 +23,9 @@ export function skeletonFor(mode: DiagramMode, structure: DiagramNode[]): DraftN
     keep.push(fixed(clause));
     const [subject] = index.children(clause.id, "subject");
     const [verb] = index.children(clause.id, "verb");
-    const [complement] = index.children(clause.id, ...COMPLEMENT_ROLES);
+    const [sharedComplement] = index.children(clause.id, ...COMPLEMENT_ROLES);
+    const [verbComplement] = verb ? index.children(verb.id, ...COMPLEMENT_ROLES) : [];
+    const complement = sharedComplement ?? verbComplement;
     if (subject) keep.push({ ...fixed(subject), implied: undefined });
     if (verb) keep.push(fixed(verb));
     if (complement) keep.push(fixed(complement));

@@ -5,6 +5,7 @@ import { PracticeApp } from "@/components/sentence/PracticeApp";
 import { SiteHeader } from "@/components/SiteHeader";
 import { getBook, getChapter, isDiagramChapter } from "@/content/books";
 import { requireUser } from "@/lib/auth";
+import { stockSentencesEnabled } from "@/lib/settings";
 
 export async function generateMetadata({ params }: { params: Promise<{ book: string; chapter: string }> }) {
   const { book, chapter } = await params;
@@ -44,6 +45,7 @@ export default async function PracticePage({ params }: { params: Promise<{ book:
           bookTitle={book.title}
           chapter={found.chapter}
           studentName={user.displayName}
+          stockMode={stockSentencesEnabled()}
         />
       ) : (
         <PracticeApp bookSlug={book.slug} bookTitle={book.title} chapter={found.chapter} studentName={user.displayName} />

@@ -26,6 +26,7 @@ const responseSchema = z.object({
         parent: z.string().nullable(),
         clauseKind: z.enum([...CLAUSE_KINDS, "none"]).optional(),
         joins: z.enum([...JOINABLE_ROLES, "none"]).optional(),
+        modifies: z.enum([...JOINABLE_ROLES, "none"]).optional(),
         implied: z.boolean().optional(),
       }),
     )
@@ -77,6 +78,7 @@ export async function generateDiagram(opts: {
         parent: n.parent,
         ...(n.clauseKind && n.clauseKind !== "none" ? { clauseKind: n.clauseKind } : {}),
         ...(n.joins && n.joins !== "none" ? { joins: n.joins } : {}),
+        ...(n.modifies && n.modifies !== "none" ? { modifies: n.modifies } : {}),
         ...(n.implied ? { implied: "you" as const } : {}),
       }));
       validateDiagram(opts.chapter, tokens, nodes);
