@@ -13,12 +13,14 @@ import { handle, jsonError } from "@/lib/api";
 import { requireApiUser } from "@/lib/auth";
 import { structureOf } from "@/lib/diagram/skeleton";
 import { stockDiagram } from "@/lib/diagram/stock";
+import { patternFor } from "@/lib/patterns";
 import { stockSentencesEnabled } from "@/lib/settings";
 
 const bodySchema = z.object({
   book: z.string(),
   chapter: z.string(),
   topic: z.string().max(100),
+  patternStep: z.number().int().min(0).max(10_000).optional(),
 });
 
 export const POST = handle(async (req: Request) => {
@@ -48,10 +50,11 @@ export const POST = handle(async (req: Request) => {
 
   const { chapter } = found;
   try {
-    const opts = { topic, gradeLevel: user.gradeLevel, avoid };
+    const pattern = patternFor(chapter, user.gradeLevel, body.patternStep ?? 0);
+    const opts = { topic, gradeLevel: user.gradeLevel, avoid, pattern };
     const generated =
       isDiagramChapter(chapter) && stockSentencesEnabled()
-        ? stockDiagram(chapter, avoid)
+        ? stockDiagram(chapter, avoid, pattern)
         : isDiagramChapter(chapter)
           ? await generateDiagram({ chapter, ...opts })
           : { ...(await generateSentence({ chapter, ...opts })), nodes: null };

@@ -1,4 +1,6 @@
+import { BOOKS } from "../src/content/books";
 import { DIAGRAMMING_BOOK } from "../src/content/diagramBook";
+import { hasPatternChecker, patternFor, patternMismatch } from "../src/lib/patterns";
 import { tokenize } from "../src/lib/tokenize";
 import { layoutDiagram, slotWidth } from "../src/lib/diagram/layout";
 import { skeletonFor } from "../src/lib/diagram/skeleton";
@@ -149,6 +151,39 @@ const [jake, washed, mixed] = chapter.examples;
   const bird = slotByWord(example.sentence, example.nodes, "bird");
   const sings = slotByWord(example.sentence, example.nodes, "sings");
   if (Math.abs(bird.slot.y - sings.slot.y) > 2) throw new Error("a simple subject and verb are not on one line");
+}
+
+for (const book of BOOKS) {
+  for (const bookChapter of book.chapters) {
+    for (const pattern of bookChapter.patterns ?? []) {
+      if (!hasPatternChecker(bookChapter.slug, pattern.id)) {
+        throw new Error(`no checker for ${bookChapter.slug}/${pattern.id}`);
+      }
+    }
+    if (bookChapter.kind !== "diagram") continue;
+    for (const example of bookChapter.examples) {
+      const tokens = tokenize(example.sentence);
+      const hits = (bookChapter.patterns ?? []).filter(
+        (pattern) => patternMismatch(bookChapter, pattern, tokens, { nodes: example.nodes }) === null,
+      );
+      if (hits.length !== 1) {
+        const names = hits.map((hit) => hit.id).join(", ") || "nothing";
+        throw new Error(`${bookChapter.slug} "${example.sentence}" matched ${names}`);
+      }
+    }
+  }
+}
+
+const subject = BOOKS.flatMap((book) => book.chapters).find((bookChapter) => bookChapter.slug === "subject");
+if (!subject) throw new Error("missing subject chapter");
+const patternId = (grade: number, step: number) => patternFor(subject, grade, step)?.id;
+const grade5 = [0, 1, 2, 3].map((step) => patternId(5, step));
+if (grade5.join(",") !== "article-adjective,adjective-noun,subject-phrase,article-adjective") {
+  throw new Error(`grade 5 rotation was ${grade5.join(",")}`);
+}
+const grade6 = [0, 1, 2, 3, 4].map((step) => patternId(6, step));
+if (grade6.join(",") !== "article-adjective,adjective-noun,subject-phrase,compound-subject,article-adjective") {
+  throw new Error(`grade 6 rotation was ${grade6.join(",")}`);
 }
 
 console.log("compound diagram checks passed");

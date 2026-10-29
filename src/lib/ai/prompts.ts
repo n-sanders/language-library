@@ -1,5 +1,6 @@
-import type { TaggingChapter } from "@/content/books";
+import type { SentencePattern, TaggingChapter } from "@/content/books";
 import { gradeGuidance, gradeLabel } from "@/lib/grade";
+import { shapeLines } from "@/lib/patterns";
 import { detokenize } from "@/lib/tokenize";
 import type { AnswerKey, Token } from "@/lib/types";
 import type { ChatMessage } from "./openrouter";
@@ -35,9 +36,10 @@ export function sentenceMessages(opts: {
   topic: string;
   gradeLevel: number;
   avoid: string[];
+  pattern?: SentencePattern | null;
   previousError?: string;
 }): ChatMessage[] {
-  const { chapter, topic, gradeLevel, avoid, previousError } = opts;
+  const { chapter, topic, gradeLevel, avoid, pattern, previousError } = opts;
   const labelLines = chapter.labels
     .map(
       (l) =>
@@ -68,6 +70,7 @@ export function sentenceMessages(opts: {
     "",
     "Rules for this chapter:",
     ...chapter.generationRules.map((r) => `- ${r}`),
+    ...shapeLines(pattern ?? null),
     avoid.length ? `\nDo not reuse or closely copy any of these recent sentences:\n${avoid.map((s) => `- ${s}`).join("\n")}` : "",
     previousError ? `\nYour previous answer was rejected: ${previousError} Please fix this.` : "",
   ].join("\n");

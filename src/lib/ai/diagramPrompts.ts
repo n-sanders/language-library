@@ -1,7 +1,8 @@
-import type { DiagramChapter } from "@/content/books";
+import type { DiagramChapter, SentencePattern } from "@/content/books";
 import { describeDiagram } from "@/lib/diagram/describe";
 import { CLAUSE_KINDS, DIAGRAM_ROLES, JOINABLE_ROLES, ROLE_NAMES, type DiagramNode } from "@/lib/diagram/types";
 import { gradeGuidance, gradeLabel } from "@/lib/grade";
+import { matchingExamples, shapeLines } from "@/lib/patterns";
 import { detokenize, tokenize } from "@/lib/tokenize";
 import type { Token } from "@/lib/types";
 import type { ChatMessage } from "./openrouter";
@@ -79,9 +80,11 @@ export function diagramMessages(opts: {
   topic: string;
   gradeLevel: number;
   avoid: string[];
+  pattern?: SentencePattern | null;
   previousError?: string;
 }): ChatMessage[] {
-  const { chapter, topic, gradeLevel, avoid, previousError } = opts;
+  const { chapter, topic, gradeLevel, avoid, pattern, previousError } = opts;
+  const samples = matchingExamples(chapter, pattern ?? null);
 
   const system = [
     "You write practice sentences for a children's homeschool grammar app and produce a precise Reed-Kellogg sentence diagram as the answer key.",
@@ -95,7 +98,7 @@ export function diagramMessages(opts: {
     ...ROLE_RULES,
   ].join("\n");
 
-  const examples = chapter.examples.map((e) => `Sentence: ${e.sentence}\n${exampleJson(e.sentence, e.nodes)}`).join("\n\n");
+  const examples = samples.examples.map((e) => `Sentence: ${e.sentence}\n${exampleJson(e.sentence, e.nodes)}`).join("\n\n");
 
   const user = [
     `Topic: ${topic}`,
@@ -105,10 +108,13 @@ export function diagramMessages(opts: {
     "",
     "Rules for this chapter:",
     ...chapter.generationRules.map((r) => `- ${r}`),
+    ...shapeLines(pattern ?? null),
     "- Avoid contractions, possessives, gerunds, infinitives, relative clauses (who, which, that), appositives, interjections, 'please', and sentences starting with 'There' or 'Here'.",
     "- Avoid multi-word names and words that could reasonably be diagrammed more than one way.",
     "",
-    "Examples of the exact format:",
+    samples.formatOnly
+      ? "The example below shows the JSON format only. Do not copy its sentence shape. Follow the sentence shape required above."
+      : "Examples of the exact format:",
     examples,
     avoid.length ? `\nDo not reuse or closely copy any of these recent sentences:\n${avoid.map((s) => `- ${s}`).join("\n")}` : "",
     previousError ? `\nYour previous answer was rejected: ${previousError} Please fix this.` : "",

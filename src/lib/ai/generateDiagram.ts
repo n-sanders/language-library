@@ -1,8 +1,9 @@
 import { z } from "zod";
-import type { DiagramChapter } from "@/content/books";
+import type { DiagramChapter, SentencePattern } from "@/content/books";
 import { toRelations } from "@/lib/diagram/relations";
 import { CLAUSE_KINDS, DIAGRAM_ROLES, JOINABLE_ROLES, type DiagramNode } from "@/lib/diagram/types";
 import { validateDiagram } from "@/lib/diagram/validate";
+import { assertPattern } from "@/lib/patterns";
 import { getModels } from "@/lib/settings";
 import { detokenize, tokenize } from "@/lib/tokenize";
 import type { AnswerKey, Token } from "@/lib/types";
@@ -56,6 +57,7 @@ export async function generateDiagram(opts: {
   topic: string;
   gradeLevel: number;
   avoid: string[];
+  pattern?: SentencePattern | null;
 }): Promise<GeneratedDiagram> {
   const model = getModels().sentence;
   const schema = diagramSchema();
@@ -82,6 +84,7 @@ export async function generateDiagram(opts: {
         ...(n.implied ? { implied: "you" as const } : {}),
       }));
       validateDiagram(opts.chapter, tokens, nodes);
+      if (opts.pattern) assertPattern(opts.chapter, opts.pattern, tokens, { nodes });
       return { sentence: detokenize(tokens), tokens, nodes, key: toRelations(nodes), model };
     },
     { label: "generate-diagram", attemptTimeoutMs: DIAGRAM_ATTEMPT_TIMEOUT_MS },

@@ -58,6 +58,12 @@ export function DiagramPracticeApp({
   const [checking, setChecking] = useState(false);
   const [solvedCount, setSolvedCount] = useState(0);
   const startedAt = useRef(Date.now());
+  const patternStep = useRef(0);
+  const patternChapter = useRef(chapter.slug);
+  if (patternChapter.current !== chapter.slug) {
+    patternChapter.current = chapter.slug;
+    patternStep.current = 0;
+  }
 
   const done = Boolean(revealed) || Boolean(result?.perfect);
 
@@ -79,11 +85,13 @@ export function DiagramPracticeApp({
       setAttempted(false);
       resetWork(null, mode);
       try {
+        const step = patternStep.current;
         const ex = await postJson<Exercise>(
           "/api/exercises",
-          { book: bookSlug, chapter: chapter.slug, topic: nextTopic },
+          { book: bookSlug, chapter: chapter.slug, topic: nextTopic, patternStep: step },
           { timeoutMs: GENERATE_TIMEOUT_MS },
         );
+        patternStep.current = step + 1;
         setExercise(ex);
         resetWork(ex.structure, mode);
         startedAt.current = Date.now();

@@ -46,8 +46,25 @@ const chapters: DiagramChapter[] = [
     ],
     generationRules: [
       "Use only a subject, a one-word verb, and single-word modifiers (articles, adjectives, adverbs).",
-      "The verb must be an action verb with no object, for example 'The happy puppy runs quickly.'",
+      "The verb must be an action verb with no object.",
       "Include at least one adjective or article on the subject and at least one adverb on the verb.",
+    ],
+    patterns: [
+      {
+        id: "article-adverb-after",
+        instruction:
+          "Use an article and an adjective on the subject, one action verb, and a manner adverb after the verb, as in 'The little bird sings sweetly.' Do not place the adverb before the verb.",
+      },
+      {
+        id: "adjective-adverb-after",
+        instruction:
+          "Use an adjective and no article on the subject, one action verb, and a manner adverb after the verb, as in 'Little birds sing sweetly.' Do not place the adverb before the verb.",
+      },
+      {
+        id: "adverb-before",
+        instruction:
+          "Use one action verb with a manner adverb immediately before it, as in 'The little bird sweetly sings.' Also put an article or an adjective on the subject. Do not also put an adverb after the verb.",
+      },
     ],
   },
   {
@@ -70,7 +87,22 @@ const chapters: DiagramChapter[] = [
     ],
     generationRules: [
       "The sentence must have exactly one direct object.",
-      "Modifiers on the subject, verb, or direct object are welcome.",
+      "Put modifiers only where the sentence shape asks for them.",
+    ],
+    patterns: [
+      {
+        id: "object-modifier",
+        instruction: "Use exactly one direct object that has a modifier, such as 'the seed'. Do not put an adverb on the verb.",
+      },
+      {
+        id: "subject-adjective",
+        instruction:
+          "Put an adjective on the subject, and use exactly one direct object with no modifier of its own, such as 'The hungry bird ate seeds.' Do not put an adverb on the verb.",
+      },
+      {
+        id: "verb-adverb",
+        instruction: "Use exactly one direct object, and put an adverb on the verb, such as 'The bird quickly ate the seed.'",
+      },
     ],
   },
   {
@@ -101,8 +133,18 @@ const chapters: DiagramChapter[] = [
     ],
     generationRules: [
       "Use a one-word linking verb (is, are, was, were, seems, looks, feels, becomes).",
-      "Use exactly one predicate adjective OR exactly one predicate nominative, never both.",
+      "Use the predicate word named in the sentence shape, and do not use the other one.",
       "Do not use a direct object.",
+    ],
+    patterns: [
+      {
+        id: "predicate-adjective",
+        instruction: "Use a one-word linking verb and exactly one predicate adjective. Do not use a predicate nominative or a direct object.",
+      },
+      {
+        id: "predicate-nominative",
+        instruction: "Use a one-word linking verb and exactly one predicate nominative. Do not use a predicate adjective or a direct object.",
+      },
     ],
   },
   {
@@ -123,10 +165,47 @@ const chapters: DiagramChapter[] = [
         n("m1", "modifier", "s", [0]),
         n("m2", "modifier", "po", [4]),
       ]),
+      // The bird in the tree sang .
+      example("The bird in the tree sang.", [
+        main(),
+        n("s", "subject", "c", [1]),
+        n("v", "verb", "c", [5]),
+        n("p", "preposition", "s", [2]),
+        n("po", "prep-object", "p", [4]),
+        n("m1", "modifier", "s", [0]),
+        n("m2", "modifier", "po", [3]),
+      ]),
+      // The bird ate the seed in the tree .
+      example("The bird ate the seed in the tree.", [
+        main(),
+        n("s", "subject", "c", [1]),
+        n("v", "verb", "c", [2]),
+        n("o", "direct-object", "c", [4]),
+        n("p", "preposition", "o", [5]),
+        n("po", "prep-object", "p", [7]),
+        n("m1", "modifier", "s", [0]),
+        n("m2", "modifier", "o", [3]),
+        n("m3", "modifier", "po", [6]),
+      ]),
     ],
     generationRules: [
-      "Include one or two prepositional phrases, each with exactly one object.",
-      "Each prepositional phrase must clearly describe one word: the verb, the subject, or an object.",
+      "Include exactly one prepositional phrase, with exactly one object.",
+      "The phrase must describe the word named in the sentence shape.",
+    ],
+    patterns: [
+      {
+        id: "phrase-on-verb",
+        instruction: "Use exactly one prepositional phrase, and make it describe the verb, as in 'The bird sang in the tree.'",
+      },
+      {
+        id: "phrase-on-subject",
+        instruction: "Use exactly one prepositional phrase, and make it describe the subject, as in 'The bird in the tree sang.'",
+      },
+      {
+        id: "phrase-on-object",
+        instruction:
+          "Use exactly one direct object and exactly one prepositional phrase that describes that object, as in 'The bird ate the seed in the tree.'",
+      },
     ],
   },
   {
@@ -149,10 +228,14 @@ const chapters: DiagramChapter[] = [
       ]),
     ],
     generationRules: [
-      "The sentence must have exactly one indirect object AND exactly one direct object, like 'Grandpa gave the dog a bone.'",
-      "Use a verb like gave, showed, told, brought, sent, made, or handed.",
+      "The sentence must have exactly one indirect object AND exactly one direct object.",
+      "Use the verb named in the sentence shape.",
       "Do not use 'to' or 'for' before the indirect object.",
     ],
+    patterns: ["gave", "showed", "told", "brought", "sent", "handed"].map((verb) => ({
+      id: `verb-${verb}`,
+      instruction: `Use the verb "${verb}". Keep exactly one indirect object and exactly one direct object, with no "to" or "for" before the indirect object.`,
+    })),
   },
   {
     kind: "diagram",
@@ -172,11 +255,49 @@ const chapters: DiagramChapter[] = [
         n("m1", "modifier", "s1", [0]),
         n("m2", "modifier", "s2", [3]),
       ]),
+      // The bird sang and danced .
+      example("The bird sang and danced.", [
+        main(),
+        n("s", "subject", "c", [1]),
+        n("v1", "verb", "c", [2]),
+        n("v2", "verb", "c", [4]),
+        n("k", "conjunction", "c", [3], { joins: "verb" }),
+        n("m1", "modifier", "s", [0]),
+      ]),
+      // The bird ate the seed and the nut .
+      example("The bird ate the seed and the nut.", [
+        main(),
+        n("s", "subject", "c", [1]),
+        n("v", "verb", "c", [2]),
+        n("o1", "direct-object", "c", [4]),
+        n("o2", "direct-object", "c", [7]),
+        n("k", "conjunction", "c", [5], { joins: "direct-object" }),
+        n("m1", "modifier", "s", [0]),
+        n("m2", "modifier", "o1", [3]),
+        n("m3", "modifier", "o2", [6]),
+      ]),
     ],
     generationRules: [
-      "Use exactly one compound part: two subjects, two verbs, or two direct objects joined by and, or, or but.",
+      "Join the compound part named in the sentence shape with and.",
       "If the verbs are compound, do not use any direct object, indirect object, or predicate word.",
       "Keep it to one clause.",
+    ],
+    patterns: [
+      {
+        id: "compound-subject",
+        instruction:
+          "Use a compound subject: exactly two subjects joined by and, exactly one verb, and no direct object. Example shape: 'The bird and the squirrel ate.'",
+      },
+      {
+        id: "compound-verb",
+        instruction:
+          "Use a compound verb: exactly one subject, exactly two verbs joined by and, and no direct object. Example shape: 'The bird sang and danced.'",
+      },
+      {
+        id: "compound-object",
+        instruction:
+          "Use a compound direct object: exactly one subject, exactly one verb, and exactly two direct objects joined by and. Example shape: 'The bird ate the seed and the nut.'",
+      },
     ],
   },
   {
@@ -229,11 +350,28 @@ const chapters: DiagramChapter[] = [
       ]),
     ],
     generationRules: [
-      "Use exactly one of these patterns: a compound subject and a compound verb with nothing after the verbs; a compound verb whose verbs share one compound direct object, including a modifier of that whole object; or two or three verbs where each verb that needs one has its own object, adverb, or prepositional phrase parented to that verb.",
+      "Follow the sentence shape. It is the only compound pattern to use.",
       "One clause only. At most three verbs. Join each compound with a single and. Commas are punctuation and are not placed on the diagram.",
       "When the verbs share an object, the object and its conjunction parent to the clause. When each verb has its own object, that object parents to the verb.",
       "A word that modifies every part of a compound, such as 'the' in 'the sticky pots and greasy pans', is a modifier parented to the clause with modifies set to direct-object.",
       "Do not use a predicate adjective, predicate nominative, indirect object, dependent clause, or a second independent clause.",
+    ],
+    patterns: [
+      {
+        id: "subject-and-verb",
+        instruction:
+          "Use a compound subject and a compound verb, with nothing after the verbs. Join each pair with a single and. Example shape: 'Jake and Emma laughed and clapped.'",
+      },
+      {
+        id: "shared-object",
+        instruction:
+          "Use one subject and a compound verb whose verbs share one compound direct object. Include a modifier of that whole object, such as 'the' in 'the sticky pots and greasy pans'. Parent the object, its conjunction, and that shared modifier to the clause.",
+      },
+      {
+        id: "per-verb",
+        instruction:
+          "Use one subject and two or three verbs joined by a single and. Each verb that takes an object, adverb, or prepositional phrase has its own, parented to that verb. Do not give the verbs one shared object.",
+      },
     ],
   },
   {
@@ -258,10 +396,14 @@ const chapters: DiagramChapter[] = [
       ]),
     ],
     generationRules: [
-      "Write two independent clauses joined by a comma and one coordinating conjunction (and, but, or).",
+      "Write two independent clauses joined by a comma and the coordinating conjunction named in the sentence shape.",
       "Each clause has its own subject and verb. Keep each clause short.",
       "Do not use a dependent clause.",
     ],
+    patterns: ["and", "but", "or"].map((word) => ({
+      id: `join-${word}`,
+      instruction: `Join the two independent clauses with a comma and "${word}". Each clause has its own subject and verb. Do not use a dependent clause.`,
+    })),
   },
   {
     kind: "diagram",
@@ -286,9 +428,13 @@ const chapters: DiagramChapter[] = [
     ],
     generationRules: [
       "Write one independent clause followed by one adverb clause that tells why, when, or where about the main verb.",
-      "Start the dependent clause with because, when, after, before, while, until, if, or since. Put it AFTER the main clause, with no comma.",
+      "Start the dependent clause with the conjunction named in the sentence shape. Put it AFTER the main clause, with no comma.",
       "Do not use relative clauses (who, which, that) and do not add a second independent clause.",
     ],
+    patterns: ["because", "when", "after", "before", "while", "until", "if", "since"].map((word) => ({
+      id: `subordinator-${word}`,
+      instruction: `Start the dependent clause with "${word}". Put that clause after the main clause, with no comma before it. Do not copy a different conjunction from the example.`,
+    })),
   },
   {
     kind: "diagram",
@@ -321,10 +467,27 @@ const chapters: DiagramChapter[] = [
       ]),
     ],
     generationRules: [
-      "Write ONE of these: a command with an understood 'you' subject (ending with a period or exclamation point), a yes/no question that starts with a helping verb (Did, Can, Will, Is, Does), or a statement with a helping verb plus a main verb (is singing, will jump, can swim).",
+      "Write the sentence kind named in the sentence shape.",
       "In a question, the helping verb and main verb both go in the verb node, and the question mark ends the sentence.",
       "Do not start a question with who, what, where, when, why, or how.",
       "For a command, the subject node has implied set to true and an empty words list.",
+    ],
+    patterns: [
+      {
+        id: "command",
+        instruction:
+          "Write a command with an understood you subject, ending with a period or an exclamation point. Do not write a question or a statement with a helping verb.",
+      },
+      {
+        id: "question",
+        instruction:
+          "Write a yes/no question that starts with a helping verb (Did, Can, Will, Is, or Does) and ends with a question mark. Do not start with who, what, where, when, why, or how.",
+      },
+      {
+        id: "verb-phrase",
+        instruction:
+          "Write a statement, ending with a period, whose verb is a helping verb plus a main verb, such as 'is singing' or 'will jump'. Do not write a command or a question.",
+      },
     ],
   },
 ];

@@ -1,5 +1,6 @@
 import { z } from "zod";
-import type { TaggingChapter } from "@/content/books";
+import type { SentencePattern, TaggingChapter } from "@/content/books";
+import { assertPattern } from "@/lib/patterns";
 import { getModels } from "@/lib/settings";
 import type { AnswerKey, Token } from "@/lib/types";
 import { AnswerKeyError, buildAnswerKey } from "./answerKey";
@@ -37,6 +38,7 @@ export async function generateSentence(opts: {
   topic: string;
   gradeLevel: number;
   avoid: string[];
+  pattern?: SentencePattern | null;
 }): Promise<GeneratedSentence> {
   const model = getModels().sentence;
   const schema = sentenceSchema(opts.chapter);
@@ -53,6 +55,7 @@ export async function generateSentence(opts: {
       const parsed = responseSchema.parse(parseJson(content));
       const sentence = parsed.sentence.replace(/\s+/g, " ").trim();
       const { tokens, key } = buildAnswerKey(opts.chapter, sentence, parsed.spans);
+      if (opts.pattern) assertPattern(opts.chapter, opts.pattern, tokens, { key });
       return { sentence, tokens, key, model };
     },
     { label: "generate" },
