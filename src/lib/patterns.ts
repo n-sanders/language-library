@@ -42,6 +42,7 @@ const TIME_ADVERBS = new Set([
   "sometimes",
   "never",
 ]);
+const CONJUNCTIONS = new Set(["and", "or", "but"]);
 
 type Source = { key?: AnswerKey; nodes?: DiagramNode[] | null };
 type Check = (tokens: Token[], source: Source) => string | null;
@@ -241,14 +242,42 @@ function nounVerbPatterns(): Record<string, Check> {
   };
 }
 
+/** Subject, then verb, ignoring articles, tagged adjectives, the adverb, conjunctions, and prepositional phrases. */
+function mainVerb(tokens: Token[], adjectives: number[], adverb: number): number | null {
+  const adjectiveAt = new Set(adjectives);
+  const skip = new Set<number>([adverb]);
+
+  for (let i = 0; i < tokens.length; i++) {
+    if (!tokens[i].isWord || !PREPOSITIONS.has(wordAt(tokens, i))) continue;
+    for (let j = i + 1; j < tokens.length; j++) {
+      if (!tokens[j].isWord || j === adverb || ARTICLES.has(wordAt(tokens, j)) || adjectiveAt.has(j)) continue;
+      skip.add(j);
+      break;
+    }
+  }
+
+  const core: number[] = [];
+  for (let i = 0; i < tokens.length; i++) {
+    if (!tokens[i].isWord || skip.has(i) || adjectiveAt.has(i)) continue;
+    const word = wordAt(tokens, i);
+    if (ARTICLES.has(word) || PREPOSITIONS.has(word) || CONJUNCTIONS.has(word)) continue;
+    core.push(i);
+  }
+  return core[1] ?? null;
+}
+
 function adverbPatterns(): Record<string, Check> {
   const adverb = (tokens: Token[], source: Source) => {
     const key = requireKey(source);
     if (typeof key === "string") return key;
     const adverbs = wordIndices(tokens, key.adverb);
-    const verbs = wordIndices(tokens, key.verb);
     if (adverbs.length !== 1) return "Use exactly one adverb.";
-    return { adverb: adverbs[0], verbs, time: TIME_ADVERBS.has(wordAt(tokens, adverbs[0])) };
+    const at = adverbs[0];
+    return {
+      adverb: at,
+      verb: mainVerb(tokens, wordIndices(tokens, key.adjective), at),
+      time: TIME_ADVERBS.has(wordAt(tokens, at)),
+    };
   };
 
   return {
@@ -256,7 +285,7 @@ function adverbPatterns(): Record<string, Check> {
       const found = adverb(tokens, source);
       if (typeof found === "string" || !("adverb" in found)) return found as string;
       if (found.time) return "Use a manner adverb, not a time adverb.";
-      if (found.verbs.length === 0 || found.adverb <= Math.max(...found.verbs)) return "Put the manner adverb after the verb.";
+      if (found.verb === null || found.adverb <= found.verb) return "Put the manner adverb after the verb.";
       return null;
     },
     "time-adverb": (tokens, source) => {
@@ -270,7 +299,7 @@ function adverbPatterns(): Record<string, Check> {
       if (typeof found === "string" || !("adverb" in found)) return found as string;
       if (found.time) return "Use a manner adverb, not a time adverb.";
       const following = nextWord(tokens, found.adverb);
-      if (following === null || !found.verbs.includes(following)) return "Place the manner adverb immediately before the verb.";
+      if (found.verb === null || following !== found.verb) return "Place the manner adverb immediately before the verb.";
       return null;
     },
   };
